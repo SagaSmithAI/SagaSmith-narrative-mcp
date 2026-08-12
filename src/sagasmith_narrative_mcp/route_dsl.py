@@ -105,6 +105,208 @@ def canonical_sha256(value: Any) -> str:
 Operator = Callable[[Any, dict[str, Any], dict[str, Any]], bool]
 
 
+class PerformanceOracle:
+    """Validate Pack-declared character evidence without interpreting prose.
+
+    The Pack is the semantic oracle.  This class checks exact declared markers,
+    references, stage order, belief edges, and private-token separation.  It
+    deliberately does not score style, sentiment, or story quality.
+    """
+
+    def __init__(self, value: Mapping[str, Any] | None = None) -> None:
+        document = deepcopy(dict(value or {}))
+        if document and document.get("schema_version") != 1:
+            raise ValueError("performance contract schema_version must be 1")
+        self.contracts = {
+            str(key): deepcopy(dict(contract))
+            for key, contract in dict(document.get("characters") or {}).items()
+        }
+        for character, contract in self.contracts.items():
+            self._validate_contract(character, contract)
+        self.private_beats: dict[str, dict[str, Any]] = {}
+        self.public_beats: set[str] = set()
+        self.beats_by_character: dict[str, set[str]] = {
+            key: set() for key in self.contracts
+        }
+        self.markers_by_character: dict[str, set[str]] = {
+            key: set() for key in self.contracts
+        }
+        self.current_beliefs = {
+            key: str(contract.get("initial_belief") or "")
+            for key, contract in self.contracts.items()
+        }
+        self.last_stage_index = {key: -1 for key in self.contracts}
+        self.motivation_links = 0
+        self.belief_transitions = 0
+        self.relationship_links = 0
+        self.red_line_checks = 0
+        self.voice_failures = 0
+        self.private_leaks = 0
+        self.red_line_violations = 0
+        self.stage_regressions = 0
+
+    @staticmethod
+    def _required_strings(value: Any, field_name: str) -> list[str]:
+        if not isinstance(value, list) or not value:
+            raise ValueError(f"performance contract {field_name} must be a non-empty list")
+        result = [str(item) for item in value]
+        if any(not item for item in result) or len(set(result)) != len(result):
+            raise ValueError(f"performance contract {field_name} must contain unique strings")
+        return result
+
+    @classmethod
+    def _validate_contract(cls, character: str, contract: Mapping[str, Any]) -> None:
+        if not character:
+            raise ValueError("performance contract character must be non-empty")
+        for field_name in ("public_goal_ref", "private_motive_ref", "initial_belief"):
+            if not isinstance(contract.get(field_name), str) or not contract[field_name]:
+                raise ValueError(f"performance contract {field_name} must be a non-empty string")
+        cls._required_strings(contract.get("red_line_refs"), "red_line_refs")
+        cls._required_strings(contract.get("relationship_refs"), "relationship_refs")
+        cls._required_strings(contract.get("voice_markers"), "voice_markers")
+        cls._required_strings(contract.get("private_tokens"), "private_tokens")
+        cls._required_strings(contract.get("stage_order"), "stage_order")
+        transitions = contract.get("allowed_belief_transitions")
+        if not isinstance(transitions, list):
+            raise ValueError("performance contract allowed_belief_transitions must be a list")
+        edges: list[tuple[str, str]] = []
+        for edge in transitions:
+            if (
+                not isinstance(edge, list)
+                or len(edge) != 2
+                or not all(isinstance(item, str) and item for item in edge)
+                or edge[0] == edge[1]
+            ):
+                raise ValueError("performance belief transitions must be distinct string pairs")
+            edges.append((edge[0], edge[1]))
+        if len(set(edges)) != len(edges):
+            raise ValueError("performance belief transitions must be unique")
+
+    @staticmethod
+    def _text(action: Mapping[str, Any]) -> str:
+        return str(dict(action.get("input") or {}).get("content") or "")
+
+    def observe(self, action: Mapping[str, Any]) -> None:
+        evidence = action.get("performance_evidence")
+        if evidence is None:
+            return
+        item = deepcopy(dict(evidence))
+        npc_ref = str(item.get("npc_ref") or "")
+        contract = self.contracts.get(npc_ref)
+        if contract is None:
+            raise ValueError(f"unknown performance character: {npc_ref}")
+        beat_id = str(item.get("beat_id") or "")
+        if not beat_id:
+            raise ValueError("performance evidence requires beat_id")
+        mode = str(item.get("mode") or "")
+        text = self._text(action)
+        marker = str(item.get("voice_marker") or "")
+        if marker not in set(contract.get("voice_markers") or []) or marker not in text:
+            self.voice_failures += 1
+            raise ValueError(f"performance voice marker mismatch: {beat_id}")
+        private_tokens = [str(token) for token in contract.get("private_tokens") or []]
+
+        if mode == "private":
+            if beat_id in self.private_beats:
+                raise ValueError(f"duplicate private performance beat: {beat_id}")
+            if str(item.get("goal_ref") or "") != str(contract.get("public_goal_ref") or ""):
+                raise ValueError(f"performance public goal mismatch: {beat_id}")
+            if str(item.get("motive_ref") or "") != str(contract.get("private_motive_ref") or ""):
+                raise ValueError(f"performance private motive mismatch: {beat_id}")
+            if private_tokens and not any(token in text for token in private_tokens):
+                raise ValueError(f"private proposal does not use motive evidence: {beat_id}")
+            expected_red_lines = set(contract.get("red_line_refs") or [])
+            actual_red_lines = set(item.get("red_lines_respected") or [])
+            if actual_red_lines != expected_red_lines:
+                self.red_line_violations += 1
+                raise ValueError(f"performance red-line evidence mismatch: {beat_id}")
+            allowed_relationships = set(contract.get("relationship_refs") or [])
+            relationships = set(item.get("relationship_refs") or [])
+            if not relationships or not relationships <= allowed_relationships:
+                raise ValueError(f"performance relationship evidence mismatch: {beat_id}")
+            stage_order = [str(stage) for stage in contract.get("stage_order") or []]
+            stage = str(item.get("stage") or "")
+            if stage not in stage_order:
+                raise ValueError(f"unknown performance stage: {stage}")
+            stage_index = stage_order.index(stage)
+            if stage_index < self.last_stage_index[npc_ref]:
+                self.stage_regressions += 1
+                raise ValueError(f"performance stage regression: {beat_id}")
+            before = str(item.get("belief_before") or "")
+            after = str(item.get("belief_after") or "")
+            if before != self.current_beliefs[npc_ref]:
+                raise ValueError(f"performance belief precondition mismatch: {beat_id}")
+            if after != before:
+                allowed_edges = {
+                    (str(edge[0]), str(edge[1]))
+                    for edge in contract.get("allowed_belief_transitions") or []
+                    if isinstance(edge, list) and len(edge) == 2
+                }
+                if (before, after) not in allowed_edges or not item.get("causal_event_type"):
+                    raise ValueError(f"unsupported performance belief transition: {beat_id}")
+                self.belief_transitions += 1
+            if not item.get("causal_event_type"):
+                raise ValueError(f"performance beat lacks a causal event: {beat_id}")
+            self.current_beliefs[npc_ref] = after
+            self.last_stage_index[npc_ref] = stage_index
+            self.private_beats[beat_id] = item
+            self.beats_by_character[npc_ref].add(beat_id)
+            self.markers_by_character[npc_ref].add(marker)
+            self.motivation_links += 1
+            self.relationship_links += len(relationships)
+            self.red_line_checks += len(actual_red_lines)
+            return
+
+        if mode == "public":
+            private = self.private_beats.get(beat_id)
+            if private is None:
+                raise ValueError(f"public performance has no private proposal: {beat_id}")
+            if str(private.get("npc_ref")) != npc_ref:
+                raise ValueError(
+                    "performance character changed between proposal and publication: "
+                    f"{beat_id}"
+                )
+            leaked = [token for token in private_tokens if token and token in text]
+            if leaked:
+                self.private_leaks += len(leaked)
+                raise ValueError(f"public performance leaked private motive: {beat_id}")
+            if beat_id in self.public_beats:
+                raise ValueError(f"duplicate public performance beat: {beat_id}")
+            self.public_beats.add(beat_id)
+            self.markers_by_character[npc_ref].add(marker)
+            return
+
+        raise ValueError("performance evidence mode must be private or public")
+
+    def metrics(self) -> dict[str, int]:
+        return {
+            "performance_private_beats": len(self.private_beats),
+            "performance_public_beats": len(self.public_beats),
+            "npc_characters_performed": len(
+                [character for character, beats in self.beats_by_character.items() if beats]
+            ),
+            "characters_with_three_beats": len(
+                [
+                    character
+                    for character, beats in self.beats_by_character.items()
+                    if len(beats) >= 3
+                ]
+            ),
+            "voice_markers_exercised": sum(
+                len(value) for value in self.markers_by_character.values()
+            ),
+            "voice_consistency_failures": self.voice_failures,
+            "private_motive_leaks": self.private_leaks,
+            "red_line_violations": self.red_line_violations,
+            "red_line_checks": self.red_line_checks,
+            "motivation_causal_links": self.motivation_links,
+            "belief_transitions_evidenced": self.belief_transitions,
+            "relationship_arc_links": self.relationship_links,
+            "arc_stage_regressions": self.stage_regressions,
+            "unmatched_publications": len(set(self.private_beats) - self.public_beats),
+        }
+
+
 class OperatorRegistry:
     """Assertion operator registry used by route and ending conditions."""
 
@@ -298,7 +500,63 @@ class RouteLoader:
         for session in data["sessions"]:
             if not session.get("actions"):
                 raise ValueError(f"session has no actions: {session.get('id')}")
-        return RouteDocument(source.parent, data)
+        document = RouteDocument(source.parent, data)
+        performance_reference = data.get("performance_contract")
+        if performance_reference:
+            performance = PerformanceOracle(
+                cls.reference(document, str(performance_reference))
+            )
+            seed = cls.reference(document, "campaign-seed.json")
+            seed_content = dict(seed.get("content") or {})
+            actor_refs = {str(item.get("id")) for item in seed_content.get("actors") or []}
+            record_refs = {str(item.get("id")) for item in seed_content.get("records") or []}
+            for character, contract in performance.contracts.items():
+                required_refs = {
+                    str(contract["public_goal_ref"]),
+                    str(contract["private_motive_ref"]),
+                    *[str(item) for item in contract["red_line_refs"]],
+                    *[str(item) for item in contract["relationship_refs"]],
+                }
+                if character not in actor_refs or not required_refs <= record_refs:
+                    raise ValueError(
+                        "performance contract references must resolve in campaign-seed.json"
+                    )
+            private_beats: list[str] = []
+            public_beats: list[str] = []
+            characters: dict[str, set[str]] = {
+                character: set() for character in performance.contracts
+            }
+            actions = [
+                action
+                for session in data["sessions"]
+                for action in session["actions"]
+            ]
+            actions.extend((data.get("focused_branch_replay") or {}).get("steps", []))
+            for action in actions:
+                evidence = action.get("performance_evidence")
+                if evidence is None:
+                    continue
+                character = str(evidence.get("npc_ref") or "")
+                beat_id = str(evidence.get("beat_id") or "")
+                mode = str(evidence.get("mode") or "")
+                if character not in characters or not beat_id:
+                    raise ValueError("route performance evidence has an unknown character or beat")
+                if mode == "private":
+                    private_beats.append(beat_id)
+                    characters[character].add(beat_id)
+                elif mode == "public":
+                    public_beats.append(beat_id)
+                else:
+                    raise ValueError("route performance evidence mode must be private or public")
+            if (
+                len(set(private_beats)) != len(private_beats)
+                or len(set(public_beats)) != len(public_beats)
+                or set(private_beats) != set(public_beats)
+            ):
+                raise ValueError("every private performance beat must have one public publication")
+            if any(len(beats) < 3 for beats in characters.values()):
+                raise ValueError("every performance character requires at least three route beats")
+        return document
 
     @staticmethod
     def _unique_ids(values: list[dict[str, Any]], section: str) -> None:

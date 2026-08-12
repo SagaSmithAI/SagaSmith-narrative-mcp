@@ -15,8 +15,11 @@ separate system provider.
 
 See [Architecture and authority](docs/architecture.md) and
 [Profile and Pack lifecycle](docs/profile-and-pack.md) for the durable product
-boundary. The two self-authored regression campaigns live in
-`fixtures/ash-harbor` and `fixtures/moss-road-seasons`.
+boundary. Three self-authored regression campaigns live in `fixtures/ash-harbor`,
+`fixtures/moss-road-seasons`, and `fixtures/echo-manor-voices`. The third is a
+15-session, five-NPC character-performance campaign with declared goals,
+private motives, red lines, false beliefs, relationship arcs, voice markers,
+isolated dialogue, and a recovered alternate ending.
 
 ## Development
 
@@ -37,7 +40,7 @@ each principal, executes every declared route step, follows a focused alternate
 branch, and emits machine-readable per-campaign timelines and a combined
 summary. A non-zero exit means the run is not accepted.
 
-The Agent Host integration uses the two repositories' own environments: the
+The Agent Host integration uses the MCP and Agent repositories' own environments: the
 test process runs with `../SagaSmith-agent/.venv/Scripts/python.exe`, while the
 spawned MCP server runs with this repository's `.venv/Scripts/python.exe`:
 

@@ -1,0 +1,298 @@
+{
+  "schema_version": 1,
+  "route_id": "echo-manor-voices.route.open-archive",
+  "title": "回声公馆复杂角色主路线",
+  "equivalent_sessions": 15,
+  "performance_contract": "character-contracts.json",
+  "runner_contract": {
+    "transport": "real_mcp",
+    "host": "real_native_tool_refresh",
+    "binding": "refresh_before_every_context_sensitive_call",
+    "write_arguments": ["campaign_id", "expected_revision", "expected_branch_id", "idempotency_key"],
+    "record_patch_semantics": "load current full record, apply JSON Merge Patch, retain identity, and send the current record revision",
+    "performance_semantics": "Agent supplies Pack-declared evidence; runner validates exact voice markers, motive references, red lines, belief edges, relationship references, stage order, and private-token separation without interpreting prose",
+    "no_internal_calls": true,
+    "no_fabricated_tool_results": true,
+    "random_draws_expected": 0,
+    "parallel_fixtures": ["ash-harbor.long-campaign", "moss-road-seasons.long-campaign"]
+  },
+  "principals": {
+    "director": "principal.director",
+    "nara": "principal.nara",
+    "tao": "principal.tao",
+    "observer": "principal.observer"
+  },
+  "setup": [
+    {
+      "id": "setup.discover_skills", "principal": "director", "tool": "skill_query", "actions": ["list", "search", "get_section"],
+      "assert": [{"skill_id": "run-isolated-npc-dialogue", "operator": "visible"}, {"skill_id": "direct-narrative-campaign", "operator": "visible"}, {"metric": "whole_skill_file_returns", "operator": "eq", "value": 0}]
+    },
+    {
+      "id": "setup.create_campaign", "principal": "director", "tool": "campaign_setup", "action": "create", "input": {"name": "回声公馆", "description": "15-session complex character performance regression"},
+      "assert": [{"path": "phase", "operator": "eq", "value": "lobby"}, {"path": "system_id", "operator": "eq", "value": "narrative"}]
+    },
+    {
+      "id": "setup.profile_lifecycle", "principal": "director", "tool": "profile_change", "actions": ["create_draft", "finalize", "activate"], "load": "profile.json",
+      "assert": [{"path": "profile.id", "operator": "eq", "value": "echo-manor-voices.profile"}, {"path": "profile.mechanics_level", "operator": "eq", "value": 0}, {"path": "profile.checksum", "operator": "sha256"}]
+    },
+    {
+      "id": "setup.pack_lifecycle", "principal": "director", "tool": "pack_change", "for_each": ["campaign-seed.json", "module.json"], "actions": ["create_draft", "finalize", "import", "activate"],
+      "assert": [{"path": "status", "operator": "eq", "value": "active"}, {"path": "pack.rights.distribution", "operator": "eq", "value": "public"}]
+    },
+    {
+      "id": "setup.access_and_seed", "principal": "director", "tool": "access_change", "load": "campaign-seed.json#/content/principals",
+      "then": {"actors": "campaign-seed.json#/content/actors", "records": "campaign-seed.json#/content/records", "deferred_actor_knowledge": "campaign-seed.json#/content/actor_knowledge"},
+      "assert": [{"kind": "count", "query": "actor_query", "operator": "eq", "value": 7}, {"kind": "count", "query": "narrative_query", "operator": "eq", "value": 36}]
+    },
+    {
+      "id": "setup.enter_play", "principal": "director", "tool": "game_phase", "input": {"phase": "play"},
+      "then": {"tool": "narrative_settle", "event": {"event_type": "echo-manor.background_initialized", "summary": "每名角色只获得自己的私有背景与错误信念。", "audience_scope": "dm"}, "actor_knowledge_from": "campaign-seed.json#/content/actor_knowledge"},
+      "assert": [{"path": "phase", "operator": "eq", "value": "play"}, {"tool_visible": "npc_conversation", "operator": "eq", "value": true}, {"tool_visible": "mechanic_resolve", "operator": "eq", "value": false}, {"tool_visible": "conflict_start", "operator": "eq", "value": false}, {"notification": "tools/list_changed", "operator": "count_gte", "value": 1}]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session.01", "scene": "scene.01_archive_date", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.jiheng", "input": {"private_worker_id": "worker.jiheng.1"}, "save_result_as": "conv.jiheng.1"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.jiheng.1", "input": {"content": "先记日期：锁门令是我签的，但现在公开只会让洛芮烧掉余下档案。"}, "save_result_as": "prop.jiheng.1", "performance_evidence": {"mode": "private", "npc_ref": "actor.jiheng", "beat_id": "jiheng.1", "voice_marker": "先记日期", "goal_ref": "goal.jiheng.archive", "motive_ref": "secret.jiheng.signature", "red_lines_respected": ["redline.jiheng.testimony"], "relationship_refs": ["relationship.jiheng_luorui"], "stage": "guarded", "belief_before": "luorui_will_destroy_archive", "belief_after": "luorui_will_destroy_archive", "causal_event_type": "echo-manor.jiheng_guarded"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.jiheng.1", "input": {"proposal_id_from": "prop.jiheng.1", "content": "先记日期：我会保全原件，今天只开放目录。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.jiheng", "beat_id": "jiheng.1", "voice_marker": "先记日期"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.jiheng.1"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.jiheng_guarded", "summary": "纪衡只开放档案目录。", "audience_scope": "public"}, "record_patches": [{"id": "arc.jiheng", "patch": {"data": {"stage": "guarded", "evidence_beats": ["jiheng.1"]}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "arc.jiheng", "path": "data.stage", "operator": "eq", "value": "guarded"}, {"principal": "observer", "record": "secret.jiheng.signature", "operator": "not_visible"}]
+    },
+    {
+      "id": "session.02", "scene": "scene.02_house_lights", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.luorui", "input": {"private_worker_id": "worker.luorui.1"}, "save_result_as": "conv.luorui.1"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.luorui.1", "input": {"content": "先把灯点亮；我要逼母亲亲口承认，但我不会让任何团员替旧人冒险。"}, "save_result_as": "prop.luorui.1", "performance_evidence": {"mode": "private", "npc_ref": "actor.luorui", "beat_id": "luorui.1", "voice_marker": "先把灯点亮", "goal_ref": "goal.luorui.reopen", "motive_ref": "secret.luorui.confession", "red_lines_respected": ["redline.luorui.troupe"], "relationship_refs": ["relationship.luorui_shenlu"], "stage": "guarded", "belief_before": "shenlu_sabotaged_father", "belief_after": "shenlu_sabotaged_father", "causal_event_type": "echo-manor.luorui_guarded"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.luorui.1", "input": {"proposal_id_from": "prop.luorui.1", "content": "先把灯点亮；安全验收前不排练。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.luorui", "beat_id": "luorui.1", "voice_marker": "先把灯点亮"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.luorui.1"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.luorui_guarded", "summary": "洛芮把团员安全置于重开之前。", "audience_scope": "public"}, "record_patches": [{"id": "arc.luorui", "patch": {"data": {"stage": "guarded", "evidence_beats": ["luorui.1"]}}}, {"id": "relationship.nara_luorui", "patch": {"data": {"rating": 1, "last_cause": "echo-manor.luorui_guarded"}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "relationship.nara_luorui", "path": "data.rating", "operator": "eq", "value": 1}]
+    },
+    {
+      "id": "session.03", "scene": "scene.03_unspoken_blocking", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.shenlu", "input": {"private_worker_id": "worker.shenlu.1"}, "save_result_as": "conv.shenlu.1"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.shenlu.1", "input": {"content": "听停顿：躲在道具箱里的孩子是阿砚，这个名字只能由他自己交出来。"}, "save_result_as": "prop.shenlu.1", "performance_evidence": {"mode": "private", "npc_ref": "actor.shenlu", "beat_id": "shenlu.1", "voice_marker": "听停顿", "goal_ref": "goal.shenlu.memorial", "motive_ref": "secret.shenlu.child", "red_lines_respected": ["redline.shenlu.informant"], "relationship_refs": ["relationship.luorui_shenlu"], "stage": "guarded", "belief_before": "luorui_seeks_revenge", "belief_after": "luorui_seeks_revenge", "causal_event_type": "echo-manor.shenlu_guarded"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.shenlu.1", "input": {"proposal_id_from": "prop.shenlu.1", "content": "听停顿：纪念剧本不能替幸存者说话。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.shenlu", "beat_id": "shenlu.1", "voice_marker": "听停顿"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.shenlu.1"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.shenlu_guarded", "summary": "申鹭拒绝替匿名幸存者发言。", "audience_scope": "public"}, "record_patches": [{"id": "arc.shenlu", "patch": {"data": {"stage": "guarded", "evidence_beats": ["shenlu.1"]}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"principal": "observer", "record": "secret.shenlu.child", "operator": "not_visible"}, {"metric": "private_motive_leaks", "operator": "eq", "value": 0}]
+    },
+    {
+      "id": "session.04", "scene": "scene.04_balanced_ledger", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.baitang", "input": {"private_worker_id": "worker.baitang.1"}, "save_result_as": "conv.baitang.1"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.baitang.1", "input": {"content": "账要平：地契在火灾当夜被我调包，但重建不能再添一滴血。"}, "save_result_as": "prop.baitang.1", "performance_evidence": {"mode": "private", "npc_ref": "actor.baitang", "beat_id": "baitang.1", "voice_marker": "账要平", "goal_ref": "goal.baitang.fund", "motive_ref": "secret.baitang.deed", "red_lines_respected": ["redline.baitang.no_blood"], "relationship_refs": ["relationship.shenlu_baitang"], "stage": "guarded", "belief_before": "archive_is_counterfeit", "belief_after": "archive_is_counterfeit", "causal_event_type": "echo-manor.baitang_guarded"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.baitang.1", "input": {"proposal_id_from": "prop.baitang.1", "content": "账要平：我先支付结构勘验费。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.baitang", "beat_id": "baitang.1", "voice_marker": "账要平"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.baitang.1"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.baitang_guarded", "summary": "白棠支付了勘验费但未解释地契。", "audience_scope": "public"}, "record_patches": [{"id": "arc.baitang", "patch": {"data": {"stage": "guarded", "evidence_beats": ["baitang.1"]}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "goal.baitang.fund", "path": "data.state", "operator": "eq", "value": "open"}]
+    },
+    {
+      "id": "session.05", "scene": "scene.05_east_hinge", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.ayan", "input": {"private_worker_id": "worker.ayan.1"}, "save_result_as": "conv.ayan.1"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.ayan.1", "input": {"content": "我只说亲眼见的：我看见纪衡亲手锁了东门，但我不会交出工人名单。"}, "save_result_as": "prop.ayan.1", "performance_evidence": {"mode": "private", "npc_ref": "actor.ayan", "beat_id": "ayan.1", "voice_marker": "我只说亲眼见的", "goal_ref": "goal.ayan.workers", "motive_ref": "secret.ayan.witness", "red_lines_respected": ["redline.ayan.workers"], "relationship_refs": ["relationship.ayan_jiheng"], "stage": "guarded", "belief_before": "jiheng_wanted_people_trapped", "belief_after": "jiheng_wanted_people_trapped", "causal_event_type": "echo-manor.ayan_guarded"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.ayan.1", "input": {"proposal_id_from": "prop.ayan.1", "content": "我只说亲眼见的：东门门轴从里面受过重压。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.ayan", "beat_id": "ayan.1", "voice_marker": "我只说亲眼见的"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.ayan.1"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.ayan_guarded", "summary": "阿砚只确认了东门的物理痕迹。", "audience_scope": "public"}, "record_patches": [{"id": "arc.ayan", "patch": {"data": {"stage": "guarded", "evidence_beats": ["ayan.1"]}}}, {"id": "relationship.tao_ayan", "patch": {"data": {"rating": 1, "last_cause": "echo-manor.ayan_guarded"}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "relationship.tao_ayan", "path": "data.rating", "operator": "eq", "value": 1}, {"principal": "observer", "record": "secret.ayan.witness", "operator": "not_visible"}]
+    },
+
+    {
+      "id": "session.06", "scene": "scene.06_signature_pressure", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.jiheng", "input": {"private_worker_id": "worker.jiheng.2"}, "save_result_as": "conv.jiheng.2"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.jiheng.2", "input": {"content": "按档案说：锁门令是我签的；洛芮刚把原件移入防火柜，我得承认她不是来毁档案的。"}, "save_result_as": "prop.jiheng.2", "performance_evidence": {"mode": "private", "npc_ref": "actor.jiheng", "beat_id": "jiheng.2", "voice_marker": "按档案说", "goal_ref": "goal.jiheng.archive", "motive_ref": "secret.jiheng.signature", "red_lines_respected": ["redline.jiheng.testimony"], "relationship_refs": ["relationship.jiheng_luorui"], "stage": "pressured", "belief_before": "luorui_will_destroy_archive", "belief_after": "luorui_wants_truth_preserved", "causal_event_type": "echo-manor.jiheng_reconsiders"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.jiheng.2", "input": {"proposal_id_from": "prop.jiheng.2", "content": "按档案说：洛芮今天保全了原件，我撤回对她的指控。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.jiheng", "beat_id": "jiheng.2", "voice_marker": "按档案说"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.jiheng.2"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.jiheng_reconsiders", "summary": "纪衡承认洛芮在保护档案。", "audience_scope": "public"}, "record_patches": [{"id": "arc.jiheng", "patch": {"data": {"stage": "pressured", "evidence_beats": ["jiheng.1", "jiheng.2"]}}}, {"id": "belief.jiheng.luorui", "patch": {"data": {"belief": "luorui_wants_truth_preserved", "confidence": 2}}}, {"id": "relationship.jiheng_luorui", "patch": {"data": {"rating": -1, "last_cause": "echo-manor.jiheng_reconsiders"}}}, {"id": "clock.truth", "patch": {"data": {"current": 1}}}], "actor_knowledge": [{"action": "add", "actor_id": "actor.nara", "knowledge_key": "echo-manor.nara.signature_hint", "proposition": "纪衡承认自己签过锁门令，但尚未同意公开细节。", "epistemic_status": "known", "confidence": 3, "cause": "told_by", "disclosure_scope": "owner"}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "belief.jiheng.luorui", "path": "data.belief", "operator": "eq", "value": "luorui_wants_truth_preserved"}, {"principal": "nara", "knowledge_key": "echo-manor.nara.signature_hint", "operator": "visible"}, {"principal": "tao", "knowledge_key": "echo-manor.nara.signature_hint", "operator": "not_visible"}]
+    },
+    {
+      "id": "session.07", "scene": "scene.07_childs_shadow", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.luorui", "input": {"private_worker_id": "worker.luorui.2"}, "save_result_as": "conv.luorui.2"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.luorui.2", "input": {"content": "我不接受含糊：我要逼母亲亲口承认；可那只烧焦的儿童鞋说明她确实保护过谁。"}, "save_result_as": "prop.luorui.2", "performance_evidence": {"mode": "private", "npc_ref": "actor.luorui", "beat_id": "luorui.2", "voice_marker": "我不接受含糊", "goal_ref": "goal.luorui.reopen", "motive_ref": "secret.luorui.confession", "red_lines_respected": ["redline.luorui.troupe"], "relationship_refs": ["relationship.luorui_shenlu"], "stage": "pressured", "belief_before": "shenlu_sabotaged_father", "belief_after": "shenlu_protected_a_child", "causal_event_type": "echo-manor.luorui_reconsiders"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.luorui.2", "input": {"proposal_id_from": "prop.luorui.2", "content": "我不接受含糊：但我承认母亲当夜救过一个孩子。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.luorui", "beat_id": "luorui.2", "voice_marker": "我不接受含糊"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.luorui.2"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.luorui_reconsiders", "summary": "洛芮承认申鹭曾保护一名孩子。", "audience_scope": "public"}, "record_patches": [{"id": "arc.luorui", "patch": {"data": {"stage": "pressured", "evidence_beats": ["luorui.1", "luorui.2"]}}}, {"id": "belief.luorui.shenlu", "patch": {"data": {"belief": "shenlu_protected_a_child", "confidence": 2}}}, {"id": "relationship.luorui_shenlu", "patch": {"data": {"rating": -1, "last_cause": "echo-manor.luorui_reconsiders"}}}, {"id": "clock.truth", "patch": {"data": {"current": 2}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "belief.luorui.shenlu", "path": "data.belief", "operator": "eq", "value": "shenlu_protected_a_child"}, {"record": "relationship.luorui_shenlu", "path": "data.rating", "operator": "eq", "value": -1}]
+    },
+    {
+      "id": "session.08", "scene": "scene.08_mercy_rehearsal", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.shenlu", "input": {"private_worker_id": "worker.shenlu.2"}, "save_result_as": "conv.shenlu.2"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.shenlu.2", "input": {"content": "台词之外：躲在道具箱里的孩子是阿砚；洛芮却把公开方式交还给幸存者，她也许能选择宽恕。"}, "save_result_as": "prop.shenlu.2", "performance_evidence": {"mode": "private", "npc_ref": "actor.shenlu", "beat_id": "shenlu.2", "voice_marker": "台词之外", "goal_ref": "goal.shenlu.memorial", "motive_ref": "secret.shenlu.child", "red_lines_respected": ["redline.shenlu.informant"], "relationship_refs": ["relationship.luorui_shenlu"], "stage": "pressured", "belief_before": "luorui_seeks_revenge", "belief_after": "luorui_can_choose_mercy", "causal_event_type": "echo-manor.shenlu_reconsiders"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.shenlu.2", "input": {"proposal_id_from": "prop.shenlu.2", "content": "台词之外：披露方式应由幸存者决定，洛芮同意了。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.shenlu", "beat_id": "shenlu.2", "voice_marker": "台词之外"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.shenlu.2"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.shenlu_reconsiders", "summary": "申鹭接受由幸存者决定披露方式。", "audience_scope": "public"}, "record_patches": [{"id": "arc.shenlu", "patch": {"data": {"stage": "pressured", "evidence_beats": ["shenlu.1", "shenlu.2"]}}}, {"id": "belief.shenlu.luorui", "patch": {"data": {"belief": "luorui_can_choose_mercy", "confidence": 2}}}, {"id": "relationship.luorui_shenlu", "patch": {"data": {"rating": 0, "last_cause": "echo-manor.shenlu_reconsiders"}}}, {"id": "clock.truth", "patch": {"data": {"current": 3}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "belief.shenlu.luorui", "path": "data.belief", "operator": "eq", "value": "luorui_can_choose_mercy"}]
+    },
+    {
+      "id": "session.09", "scene": "scene.09_deed_watermark", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.baitang", "input": {"private_worker_id": "worker.baitang.2"}, "save_result_as": "conv.baitang.2"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.baitang.2", "input": {"content": "代价写清：地契在火灾当夜被我调包；水印证明档案不是伪造，而是能证明我的欺诈。"}, "save_result_as": "prop.baitang.2", "performance_evidence": {"mode": "private", "npc_ref": "actor.baitang", "beat_id": "baitang.2", "voice_marker": "代价写清", "goal_ref": "goal.baitang.fund", "motive_ref": "secret.baitang.deed", "red_lines_respected": ["redline.baitang.no_blood"], "relationship_refs": ["relationship.shenlu_baitang"], "stage": "pressured", "belief_before": "archive_is_counterfeit", "belief_after": "archive_proves_my_fraud", "causal_event_type": "echo-manor.baitang_reconsiders"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.baitang.2", "input": {"proposal_id_from": "prop.baitang.2", "content": "代价写清：我承认这份档案的水印真实。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.baitang", "beat_id": "baitang.2", "voice_marker": "代价写清"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.baitang.2"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.baitang_reconsiders", "summary": "白棠承认档案水印真实。", "audience_scope": "public"}, "record_patches": [{"id": "arc.baitang", "patch": {"data": {"stage": "pressured", "evidence_beats": ["baitang.1", "baitang.2"]}}}, {"id": "belief.baitang.archive", "patch": {"data": {"belief": "archive_proves_my_fraud", "confidence": 3}}}, {"id": "relationship.shenlu_baitang", "patch": {"data": {"rating": -2, "last_cause": "echo-manor.baitang_reconsiders"}}}, {"id": "clock.truth", "patch": {"data": {"current": 4}}}], "actor_knowledge": [{"action": "add", "actor_id": "actor.tao", "knowledge_key": "echo-manor.tao.deed_watermark", "proposition": "地契水印与白棠的旧账本一致。", "epistemic_status": "known", "confidence": 3, "cause": "examined", "disclosure_scope": "owner"}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"principal": "tao", "knowledge_key": "echo-manor.tao.deed_watermark", "operator": "visible"}, {"principal": "observer", "knowledge_key": "echo-manor.tao.deed_watermark", "operator": "not_visible"}]
+    },
+    {
+      "id": "session.10", "scene": "scene.10_forged_alarm", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.ayan", "input": {"private_worker_id": "worker.ayan.2"}, "save_result_as": "conv.ayan.2"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.ayan.2", "input": {"content": "门轴不会撒谎：我看见纪衡亲手锁了东门；但警报纸的折痕说明他服从的是伪造命令。"}, "save_result_as": "prop.ayan.2", "performance_evidence": {"mode": "private", "npc_ref": "actor.ayan", "beat_id": "ayan.2", "voice_marker": "门轴不会撒谎", "goal_ref": "goal.ayan.workers", "motive_ref": "secret.ayan.witness", "red_lines_respected": ["redline.ayan.workers"], "relationship_refs": ["relationship.ayan_jiheng"], "stage": "pressured", "belief_before": "jiheng_wanted_people_trapped", "belief_after": "jiheng_obeyed_a_forged_alarm", "causal_event_type": "echo-manor.ayan_reconsiders"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.ayan.2", "input": {"proposal_id_from": "prop.ayan.2", "content": "门轴不会撒谎：锁门发生过，但警报页也被换过。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.ayan", "beat_id": "ayan.2", "voice_marker": "门轴不会撒谎"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.ayan.2"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.ayan_reconsiders", "summary": "阿砚确认警报页曾被调包。", "audience_scope": "public"}, "record_patches": [{"id": "arc.ayan", "patch": {"data": {"stage": "pressured", "evidence_beats": ["ayan.1", "ayan.2"]}}}, {"id": "belief.ayan.jiheng", "patch": {"data": {"belief": "jiheng_obeyed_a_forged_alarm", "confidence": 2}}}, {"id": "relationship.ayan_jiheng", "patch": {"data": {"rating": -1, "last_cause": "echo-manor.ayan_reconsiders"}}}, {"id": "clock.truth", "patch": {"data": {"current": 5}}}], "actor_knowledge": [{"action": "add", "actor_id": "actor.tao", "knowledge_key": "echo-manor.tao.forged_alarm", "proposition": "警报页与档案纸张批次不一致。", "epistemic_status": "known", "confidence": 3, "cause": "examined", "disclosure_scope": "owner"}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "clock.truth", "path": "data.current", "operator": "eq", "value": 5}, {"metric": "belief_transitions_evidenced", "operator": "eq", "value": 5}]
+    },
+
+    {
+      "id": "session.11", "scene": "scene.11_archive_confession", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.jiheng", "input": {"private_worker_id": "worker.jiheng.3"}, "save_result_as": "conv.jiheng.3"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.jiheng.3", "input": {"content": "先记日期：锁门令是我签的。我要保留这句，也保留证明警报被换的原页。"}, "save_result_as": "prop.jiheng.3", "performance_evidence": {"mode": "private", "npc_ref": "actor.jiheng", "beat_id": "jiheng.3", "voice_marker": "先记日期", "goal_ref": "goal.jiheng.archive", "motive_ref": "secret.jiheng.signature", "red_lines_respected": ["redline.jiheng.testimony"], "relationship_refs": ["relationship.ayan_jiheng"], "stage": "committed", "belief_before": "luorui_wants_truth_preserved", "belief_after": "luorui_wants_truth_preserved", "causal_event_type": "echo-manor.jiheng_commits"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.jiheng.3", "input": {"proposal_id_from": "prop.jiheng.3", "content": "先记日期：我承担签名责任，并提交被替换的警报原页。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.jiheng", "beat_id": "jiheng.3", "voice_marker": "先记日期"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.jiheng.3"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.jiheng_commits", "summary": "纪衡承担签名责任并提交原页。", "audience_scope": "public"}, "record_patches": [{"id": "arc.jiheng", "patch": {"data": {"stage": "committed", "evidence_beats": ["jiheng.1", "jiheng.2", "jiheng.3"]}}}, {"id": "secret.jiheng.signature", "patch": {"status": "consent_to_disclose", "data": {"consent": "public"}}}, {"id": "relationship.ayan_jiheng", "patch": {"data": {"rating": 0, "last_cause": "echo-manor.jiheng_commits"}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "arc.jiheng", "path": "data.stage", "operator": "eq", "value": "committed"}, {"record": "relationship.ayan_jiheng", "path": "data.rating", "operator": "eq", "value": 0}]
+    },
+    {
+      "id": "session.12", "scene": "scene.12_heirs_choice", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.luorui", "input": {"private_worker_id": "worker.luorui.3"}, "save_result_as": "conv.luorui.3"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.luorui.3", "input": {"content": "先把灯点亮：我要逼母亲亲口承认的念头到此为止；阿砚自己决定何时开口。"}, "save_result_as": "prop.luorui.3", "performance_evidence": {"mode": "private", "npc_ref": "actor.luorui", "beat_id": "luorui.3", "voice_marker": "先把灯点亮", "goal_ref": "goal.luorui.reopen", "motive_ref": "secret.luorui.confession", "red_lines_respected": ["redline.luorui.troupe"], "relationship_refs": ["relationship.luorui_shenlu"], "stage": "committed", "belief_before": "shenlu_protected_a_child", "belief_after": "shenlu_protected_a_child", "causal_event_type": "echo-manor.luorui_commits"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.luorui.3", "input": {"proposal_id_from": "prop.luorui.3", "content": "先把灯点亮：幸存者拥有自己的证词。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.luorui", "beat_id": "luorui.3", "voice_marker": "先把灯点亮"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.luorui.3"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.luorui_commits", "summary": "洛芮把披露权交还给幸存者。", "audience_scope": "public"}, "record_patches": [{"id": "arc.luorui", "patch": {"data": {"stage": "committed", "evidence_beats": ["luorui.1", "luorui.2", "luorui.3"]}}}, {"id": "secret.luorui.confession", "patch": {"status": "released", "data": {"consent": "released"}}}, {"id": "relationship.luorui_shenlu", "patch": {"data": {"rating": 1, "last_cause": "echo-manor.luorui_commits"}}}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"record": "relationship.luorui_shenlu", "path": "data.rating", "operator": "eq", "value": 1}]
+    },
+    {
+      "id": "session.13", "scene": "scene.13_directors_pause", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.shenlu", "input": {"private_worker_id": "worker.shenlu.3"}, "save_result_as": "conv.shenlu.3"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.shenlu.3", "input": {"content": "听停顿：躲在道具箱里的孩子是阿砚；他刚刚点头，我才会把这段写进纪念剧。"}, "save_result_as": "prop.shenlu.3", "performance_evidence": {"mode": "private", "npc_ref": "actor.shenlu", "beat_id": "shenlu.3", "voice_marker": "听停顿", "goal_ref": "goal.shenlu.memorial", "motive_ref": "secret.shenlu.child", "red_lines_respected": ["redline.shenlu.informant"], "relationship_refs": ["relationship.luorui_shenlu"], "stage": "committed", "belief_before": "luorui_can_choose_mercy", "belief_after": "luorui_can_choose_mercy", "causal_event_type": "echo-manor.shenlu_commits"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.shenlu.3", "input": {"proposal_id_from": "prop.shenlu.3", "content": "听停顿：经当事人同意，纪念剧可以确认曾有儿童获救。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.shenlu", "beat_id": "shenlu.3", "voice_marker": "听停顿"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.shenlu.3"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.shenlu_commits", "summary": "申鹭在阿砚同意后确认儿童获救。", "audience_scope": "public"}, "record_patches": [{"id": "arc.shenlu", "patch": {"data": {"stage": "committed", "evidence_beats": ["shenlu.1", "shenlu.2", "shenlu.3"]}}}, {"id": "secret.shenlu.child", "patch": {"status": "consent_to_disclose", "data": {"consent": "granted_by_ayan"}}}, {"id": "relationship.luorui_shenlu", "patch": {"data": {"rating": 2, "last_cause": "echo-manor.shenlu_commits"}}}], "actor_knowledge": [{"action": "add", "actor_id": "actor.nara", "knowledge_key": "echo-manor.nara.child_identity", "proposition": "阿砚同意在最终证词中公开自己是获救儿童。", "epistemic_status": "known", "confidence": 3, "cause": "consented_disclosure", "disclosure_scope": "owner"}]},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"principal": "nara", "knowledge_key": "echo-manor.nara.child_identity", "operator": "visible"}, {"principal": "observer", "knowledge_key": "echo-manor.nara.child_identity", "operator": "not_visible"}]
+    },
+    {
+      "id": "session.14", "scene": "scene.14_price_of_deed", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.baitang", "input": {"private_worker_id": "worker.baitang.3"}, "save_result_as": "conv.baitang.3"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.baitang.3", "input": {"content": "账要平：地契在火灾当夜被我调包；我归还它，也承担债权损失，不让任何人为此流血。"}, "save_result_as": "prop.baitang.3", "performance_evidence": {"mode": "private", "npc_ref": "actor.baitang", "beat_id": "baitang.3", "voice_marker": "账要平", "goal_ref": "goal.baitang.fund", "motive_ref": "secret.baitang.deed", "red_lines_respected": ["redline.baitang.no_blood"], "relationship_refs": ["relationship.baitang_ayan"], "stage": "committed", "belief_before": "archive_proves_my_fraud", "belief_after": "archive_proves_my_fraud", "causal_event_type": "echo-manor.baitang_commits"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.baitang.3", "input": {"proposal_id_from": "prop.baitang.3", "content": "账要平：我归还原地契，并放弃附加债权。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.baitang", "beat_id": "baitang.3", "voice_marker": "账要平"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.baitang.3"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.baitang_commits", "summary": "白棠归还地契并放弃附加债权。", "audience_scope": "public"}, "record_patches": [{"id": "arc.baitang", "patch": {"data": {"stage": "committed", "evidence_beats": ["baitang.1", "baitang.2", "baitang.3"]}}}, {"id": "secret.baitang.deed", "patch": {"status": "disclosed", "data": {"consent": "public"}}}, {"id": "relationship.baitang_ayan", "patch": {"data": {"rating": 0, "last_cause": "echo-manor.baitang_commits"}}}]},
+        {"tool": "scene_change", "action": "end"},
+        {"tool": "snapshot_change", "action": "create", "label": "before-final-testimony"}
+      ],
+      "assert": [{"snapshot_label": "before-final-testimony", "operator": "exists"}, {"record": "relationship.baitang_ayan", "path": "data.rating", "operator": "eq", "value": 0}]
+    },
+    {
+      "id": "session.15", "scene": "scene.15_open_east_door", "principal": "director",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.ayan", "input": {"private_worker_id": "worker.ayan.3"}, "save_result_as": "conv.ayan.3"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.ayan.3", "input": {"content": "我只说亲眼见的：我看见纪衡亲手锁了东门；现在我也看见他提交原页、白棠归还地契。"}, "save_result_as": "prop.ayan.3", "performance_evidence": {"mode": "private", "npc_ref": "actor.ayan", "beat_id": "ayan.3", "voice_marker": "我只说亲眼见的", "goal_ref": "goal.ayan.workers", "motive_ref": "secret.ayan.witness", "red_lines_respected": ["redline.ayan.workers"], "relationship_refs": ["relationship.ayan_jiheng"], "stage": "committed", "belief_before": "jiheng_obeyed_a_forged_alarm", "belief_after": "jiheng_obeyed_a_forged_alarm", "causal_event_type": "echo-manor.ayan_commits"}},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.ayan.3", "input": {"proposal_id_from": "prop.ayan.3", "content": "我只说亲眼见的：东门曾被锁，警报曾被换；责任不该落在工人身上。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.ayan", "beat_id": "ayan.3", "voice_marker": "我只说亲眼见的"}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.ayan.3"},
+        {"tool": "narrative_settle", "event": {"event_type": "echo-manor.campaign_ending", "summary": "阿砚完成证词，回声公馆以公开档案和安全章程重新开门。", "audience_scope": "public"}, "record_patches": [{"id": "arc.ayan", "patch": {"data": {"stage": "committed", "evidence_beats": ["ayan.1", "ayan.2", "ayan.3"]}}}, {"id": "secret.ayan.witness", "patch": {"status": "disclosed", "data": {"consent": "public"}}}, {"id": "relationship.ayan_jiheng", "patch": {"data": {"rating": 1, "last_cause": "echo-manor.ayan_commits"}}}, {"id": "location.echo_manor", "patch": {"status": "reopened"}}], "record_creates": [{"id": "ending.open_archive", "kind": "thread", "title": "公开档案与安全重开", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.open_archive"}}], "facts": [{"action": "upsert", "fact_key": "echo-manor.fire.record_public", "content": "东门曾被锁且警报页曾被调包，责任不归于普通工人。", "kind": "public_record", "subject_ref": "location.echo_manor", "predicate": "has_public_fire_record", "disclosure_scope": "public"}], "snapshot": {"label": "ending-open-archive", "recap": {"ending_id": "ending.open_archive", "equivalent_sessions": 15}}},
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [{"ending": "ending.open_archive", "operator": "legal"}, {"record": "arc.ayan", "path": "data.stage", "operator": "eq", "value": "committed"}, {"snapshot_label": "ending-open-archive", "operator": "exists"}]
+    }
+  ],
+  "fault_injection": [
+    {"id": "audience.observer_motive", "after": "session.05", "attempt": {"principal": "observer", "query_record": "secret.ayan.witness"}, "assert": [{"error": "private", "operator": "contains"}]},
+    {"id": "retry.exact_character_settlement", "after": "session.10", "repeat_previous_write_with_same_key_and_payload": true, "assert": [{"path": "response", "operator": "exact_replay"}, {"path": "campaign_revision", "operator": "unchanged_on_replay"}, {"event_type": "echo-manor.ayan_reconsiders", "operator": "count_eq", "value": 1}]},
+    {"id": "revision.stale_relationship", "after": "session.12", "attempt": {"record": "relationship.luorui_shenlu", "expected_record_revision_delta": -1}, "assert": [{"error": "record revision conflict", "operator": "contains"}, {"record": "relationship.luorui_shenlu", "path": "data.rating", "operator": "eq", "value": 1}]},
+    {"id": "audience.observer_child", "after": "session.13", "attempt": {"principal": "observer", "query_actor_knowledge": "echo-manor.nara.child_identity"}, "assert": [{"knowledge_key": "echo-manor.nara.child_identity", "operator": "not_visible"}]}
+  ],
+  "focused_branch_replay": {
+    "id": "branch.witness-trust", "from_snapshot": "before-final-testimony",
+    "steps": [
+      {"tool": "snapshot_change", "action": "restore", "assert_binding_changed": true},
+      {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.ayan", "input": {"private_worker_id": "worker.ayan.alt"}, "save_result_as": "conv.ayan.alt"},
+      {"tool": "npc_conversation", "action": "propose", "conversation_from": "conv.ayan.alt", "input": {"content": "门轴不会撒谎：我看见纪衡亲手锁了东门；真相已经够多，但建筑还没准备好。"}, "save_result_as": "prop.ayan.alt", "performance_evidence": {"mode": "private", "npc_ref": "actor.ayan", "beat_id": "ayan.alt", "voice_marker": "门轴不会撒谎", "goal_ref": "goal.ayan.workers", "motive_ref": "secret.ayan.witness", "red_lines_respected": ["redline.ayan.workers"], "relationship_refs": ["relationship.ayan_jiheng"], "stage": "committed", "belief_before": "jiheng_obeyed_a_forged_alarm", "belief_after": "jiheng_obeyed_a_forged_alarm", "causal_event_type": "echo-manor.ayan_trust_choice"}},
+      {"tool": "npc_conversation", "action": "publish", "conversation_from": "conv.ayan.alt", "input": {"proposal_id_from": "prop.ayan.alt", "content": "门轴不会撒谎：证词公开，但重开应等到工人确认安全。", "audience": {"scope": "table"}}, "performance_evidence": {"mode": "public", "npc_ref": "actor.ayan", "beat_id": "ayan.alt", "voice_marker": "门轴不会撒谎"}},
+      {"tool": "npc_conversation", "action": "close", "conversation_from": "conv.ayan.alt"},
+      {"tool": "narrative_settle", "event": {"event_type": "echo-manor.campaign_ending", "summary": "众人暂缓重开，把公馆交给证人与工人共同管理。", "audience_scope": "public"}, "record_patches": [{"id": "arc.ayan", "patch": {"data": {"stage": "committed", "evidence_beats": ["ayan.1", "ayan.2", "ayan.alt"]}}}, {"id": "location.echo_manor", "patch": {"status": "witness_trust"}}], "record_creates": [{"id": "ending.witness_trust", "kind": "thread", "title": "证人信托", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.witness_trust"}}]}
+    ],
+    "assert": [{"ending": "ending.witness_trust", "operator": "legal"}, {"binding_path": "branch_id", "operator": "ne_pre_restore"}, {"notification": "tools/list_changed", "operator": "count_gte", "value": 1}, {"original_branch_record": "ending.open_archive", "operator": "preserved"}]
+  },
+  "final_assertions": [
+    {"metric": "equivalent_sessions_completed", "operator": "eq", "value": 15},
+    {"metric": "legal_endings_reached", "operator": "set_eq", "value": ["ending.open_archive", "ending.witness_trust"]},
+    {"metric": "performance_private_beats", "operator": "eq", "value": 16},
+    {"metric": "performance_public_beats", "operator": "eq", "value": 16},
+    {"metric": "npc_characters_performed", "operator": "eq", "value": 5},
+    {"metric": "characters_with_three_beats", "operator": "eq", "value": 5},
+    {"metric": "voice_markers_exercised", "operator": "gte", "value": 10},
+    {"metric": "voice_consistency_failures", "operator": "eq", "value": 0},
+    {"metric": "private_motive_leaks", "operator": "eq", "value": 0},
+    {"metric": "red_line_violations", "operator": "eq", "value": 0},
+    {"metric": "red_line_checks", "operator": "gte", "value": 16},
+    {"metric": "motivation_causal_links", "operator": "eq", "value": 16},
+    {"metric": "belief_transitions_evidenced", "operator": "eq", "value": 5},
+    {"metric": "relationship_arc_links", "operator": "gte", "value": 16},
+    {"metric": "arc_stage_regressions", "operator": "eq", "value": 0},
+    {"metric": "unmatched_publications", "operator": "eq", "value": 0},
+    {"metric": "director_private_proposals", "operator": "eq", "value": 0},
+    {"metric": "unclosed_npc_conversations", "operator": "eq", "value": 0},
+    {"metric": "mechanic_resolve_calls", "operator": "eq", "value": 0},
+    {"metric": "conflict_tool_calls", "operator": "eq", "value": 0},
+    {"metric": "idempotency_duplicate_events", "operator": "eq", "value": 0},
+    {"metric": "private_audience_leaks", "operator": "eq", "value": 0},
+    {"metric": "authority_bypasses", "operator": "eq", "value": 0},
+    {"metric": "internal_service_calls", "operator": "eq", "value": 0},
+    {"metric": "fabricated_tool_results", "operator": "eq", "value": 0}
+  ]
+}

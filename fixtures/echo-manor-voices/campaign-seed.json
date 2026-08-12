@@ -1,0 +1,103 @@
+{
+  "id": "echo-manor-voices.seed",
+  "version": "1.0.0",
+  "title": "回声公馆角色与关系种子",
+  "kind": "campaign_seed",
+  "profile_requirements": [
+    {"id": "echo-manor-voices.profile", "version": "1.0.0", "capabilities": ["character_performance", "multi_audience", "npc_conversation"], "forbidden_capabilities": ["conflict", "mechanics"]}
+  ],
+  "dependencies": [],
+  "sources": [
+    {"id": "echo-manor-voices.seed-source", "type": "self-authored", "license": "Apache-2.0", "distribution": "public", "citation": "fixtures/echo-manor-voices/campaign-seed.json"}
+  ],
+  "rights": {"license": "Apache-2.0", "distribution": "public", "contains_private_source_material": false},
+  "review": {"agent_finalization": true, "reviewer": "fixture-author", "evidence_checked": true, "mechanical_validation": "required"},
+  "content": {
+    "campaign": {"name": "回声公馆", "description": "五名彼此误解的旧剧院关系人重返火灾现场。", "starting_phase": "lobby"},
+    "principals": [
+      {"id": "principal.director", "role": "owner"},
+      {"id": "principal.nara", "role": "player", "actor_grants": ["actor.nara"]},
+      {"id": "principal.tao", "role": "player", "actor_grants": ["actor.tao"]},
+      {"id": "principal.observer", "role": "observer"}
+    ],
+    "actors": [
+      {
+        "id": "actor.nara", "name": "娜拉", "type": "player_character", "summary": "负责口述史的调查者。",
+        "sheet": {"dramatic_role": "witness_interviewer", "public_goal": "完成不伤害证人的火灾口述史", "private_motive": "证明自己不会重演父亲逼供的方式", "red_lines": ["不替证人公开秘密"], "false_beliefs": ["只要记录完整就能修复关系"], "voice": {"cadence": "短问句后留白", "markers": ["你可以不回答"]}, "relationship_history": ["父亲曾调查同一场火灾"], "arc_stage": "guarded"}
+      },
+      {
+        "id": "actor.tao", "name": "陶临", "type": "player_character", "summary": "负责修复舞台结构的建筑师。",
+        "sheet": {"dramatic_role": "material_witness", "public_goal": "确认公馆能否安全重开", "private_motive": "找出导师为何删改原始图纸", "red_lines": ["不伪造结构证据"], "false_beliefs": ["建筑痕迹比人的记忆可靠"], "voice": {"cadence": "先描述材料再判断", "markers": ["先看受力"]}, "relationship_history": ["导师曾受白棠资助"], "arc_stage": "guarded"}
+      },
+      {
+        "id": "actor.jiheng", "name": "纪衡", "type": "persistent_npc", "summary": "保存剧院档案的前夜班书记。",
+        "sheet": {"dramatic_role": "guilty_archivist", "public_goal": "保全全部原始档案", "private_motive": "承认自己签过锁门令但证明命令被伪造", "red_lines": ["绝不销毁证词"], "false_beliefs": ["洛芮会为了家名焚毁档案"], "voice": {"cadence": "先报日期再陈述", "markers": ["先记日期", "按档案说"]}, "relationship_history": ["曾替洛芮父亲整理账本", "阿砚一直认为他故意锁门"], "arc_stage": "guarded"}
+      },
+      {
+        "id": "actor.luorui", "name": "洛芮", "type": "persistent_npc", "summary": "继承回声公馆的年轻剧团负责人。",
+        "sheet": {"dramatic_role": "angry_heir", "public_goal": "让剧院以纪念演出重新开门", "private_motive": "逼母亲申鹭承认火灾当夜保护了谁", "red_lines": ["绝不拿现役团员冒险"], "false_beliefs": ["申鹭为保名声破坏了父亲的逃生方案"], "voice": {"cadence": "命令句清楚直接", "markers": ["先把灯点亮", "我不接受含糊"]}, "relationship_history": ["把纪衡视为父亲的共犯", "十年未称申鹭为母亲"], "arc_stage": "guarded"}
+      },
+      {
+        "id": "actor.shenlu", "name": "申鹭", "type": "persistent_npc", "summary": "退隐的导演，也是洛芮的母亲。",
+        "sheet": {"dramatic_role": "protective_director", "public_goal": "完成不消费死者的纪念演出", "private_motive": "保护当年藏在道具箱里的幼年阿砚", "red_lines": ["不在未经同意时说出幸存儿童身份"], "false_beliefs": ["洛芮回来只为报复"], "voice": {"cadence": "用排练术语谈真实情绪", "markers": ["听停顿", "台词之外"]}, "relationship_history": ["拒绝白棠删改纪念剧本", "因沉默失去洛芮信任"], "arc_stage": "guarded"}
+      },
+      {
+        "id": "actor.baitang", "name": "白棠", "type": "persistent_npc", "summary": "资助重建的商人和旧剧院债权人。",
+        "sheet": {"dramatic_role": "polite_fraudster", "public_goal": "资助重建并清偿旧债", "private_motive": "掩盖自己在火灾当夜调包地契", "red_lines": ["不允许任何人为债务流血"], "false_beliefs": ["纪衡的档案是为勒索而伪造"], "voice": {"cadence": "把每个选择改写成交易", "markers": ["账要平", "代价写清"]}, "relationship_history": ["长期资助申鹭的剧团", "曾让阿砚一家失去住处"], "arc_stage": "guarded"}
+      },
+      {
+        "id": "actor.ayan", "name": "阿砚", "type": "persistent_npc", "summary": "火灾幸存者与现任舞台机械师。",
+        "sheet": {"dramatic_role": "reluctant_witness", "public_goal": "保证工人不为重开承担风险", "private_motive": "公开东门真相但不让工人变成替罪羊", "red_lines": ["绝不出卖任何工人证人"], "false_beliefs": ["纪衡明知有人仍故意锁门"], "voice": {"cadence": "只从可触摸的细节作证", "markers": ["我只说亲眼见的", "门轴不会撒谎"]}, "relationship_history": ["幼年被申鹭藏进道具箱救出", "多年拒绝与纪衡说话"], "arc_stage": "guarded"}
+      }
+    ],
+    "records": [
+      {"id": "location.echo_manor", "kind": "location", "title": "回声公馆", "status": "closed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"tags": ["burned_theatre", "sealed"], "parent_ref": null}},
+      {"id": "location.archive", "kind": "location", "title": "潮湿档案室", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"tags": ["ledgers", "water_damage"], "parent_ref": "location.echo_manor"}},
+      {"id": "location.stage", "kind": "location", "title": "焦黑舞台", "status": "unsafe", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"tags": ["counterweights", "east_door"], "parent_ref": "location.echo_manor"}},
+
+      {"id": "goal.jiheng.archive", "kind": "goal", "title": "保全档案", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.jiheng"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"owner_ref": "actor.jiheng", "statement": "保全全部原始档案", "state": "open"}},
+      {"id": "goal.luorui.reopen", "kind": "goal", "title": "安全重开", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.luorui"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"owner_ref": "actor.luorui", "statement": "以纪念演出安全重开", "state": "open"}},
+      {"id": "goal.shenlu.memorial", "kind": "goal", "title": "诚实纪念", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.shenlu"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"owner_ref": "actor.shenlu", "statement": "完成不消费死者的纪念演出", "state": "open"}},
+      {"id": "goal.baitang.fund", "kind": "goal", "title": "清偿旧债", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.baitang"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"owner_ref": "actor.baitang", "statement": "资助重建并清偿旧债", "state": "open"}},
+      {"id": "goal.ayan.workers", "kind": "goal", "title": "工人安全", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.ayan"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"owner_ref": "actor.ayan", "statement": "保证工人不为重开承担风险", "state": "open"}},
+
+      {"id": "secret.jiheng.signature", "kind": "secret", "title": "纪衡的签名", "status": "hidden", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.jiheng"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"holder_ref": "actor.jiheng", "proposition": "锁门令是我签的，但警报页后来被换过。", "consent": "withheld"}},
+      {"id": "secret.luorui.confession", "kind": "secret", "title": "洛芮的逼问", "status": "hidden", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.luorui"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"holder_ref": "actor.luorui", "proposition": "我要逼母亲亲口承认她保护了谁。", "consent": "withheld"}},
+      {"id": "secret.shenlu.child", "kind": "secret", "title": "道具箱里的孩子", "status": "hidden", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.shenlu"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"holder_ref": "actor.shenlu", "proposition": "躲在道具箱里的孩子是阿砚。", "consent": "requires_ayan"}},
+      {"id": "secret.baitang.deed", "kind": "secret", "title": "被调包的地契", "status": "hidden", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.baitang"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"holder_ref": "actor.baitang", "proposition": "地契在火灾当夜被我调包。", "consent": "withheld"}},
+      {"id": "secret.ayan.witness", "kind": "secret", "title": "东门目击", "status": "hidden", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.ayan"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"holder_ref": "actor.ayan", "proposition": "我看见纪衡亲手锁了东门，却没看见谁送来警报。", "consent": "withheld"}},
+
+      {"id": "belief.jiheng.luorui", "kind": "status", "title": "纪衡对洛芮的错误判断", "status": "active", "revision": 0, "audience": {"scope": "actor", "actor_id": "actor.jiheng"}, "controller": {"actor_id": "actor.jiheng"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"subject_ref": "actor.jiheng", "belief": "luorui_will_destroy_archive", "confidence": 3, "revisable": true}},
+      {"id": "belief.luorui.shenlu", "kind": "status", "title": "洛芮对申鹭的错误判断", "status": "active", "revision": 0, "audience": {"scope": "actor", "actor_id": "actor.luorui"}, "controller": {"actor_id": "actor.luorui"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"subject_ref": "actor.luorui", "belief": "shenlu_sabotaged_father", "confidence": 3, "revisable": true}},
+      {"id": "belief.shenlu.luorui", "kind": "status", "title": "申鹭对洛芮的错误判断", "status": "active", "revision": 0, "audience": {"scope": "actor", "actor_id": "actor.shenlu"}, "controller": {"actor_id": "actor.shenlu"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"subject_ref": "actor.shenlu", "belief": "luorui_seeks_revenge", "confidence": 3, "revisable": true}},
+      {"id": "belief.baitang.archive", "kind": "status", "title": "白棠对档案的错误判断", "status": "active", "revision": 0, "audience": {"scope": "actor", "actor_id": "actor.baitang"}, "controller": {"actor_id": "actor.baitang"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"subject_ref": "actor.baitang", "belief": "archive_is_counterfeit", "confidence": 3, "revisable": true}},
+      {"id": "belief.ayan.jiheng", "kind": "status", "title": "阿砚对纪衡的错误判断", "status": "active", "revision": 0, "audience": {"scope": "actor", "actor_id": "actor.ayan"}, "controller": {"actor_id": "actor.ayan"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"subject_ref": "actor.ayan", "belief": "jiheng_wanted_people_trapped", "confidence": 3, "revisable": true}},
+
+      {"id": "redline.jiheng.testimony", "kind": "commitment", "title": "不毁证词", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.jiheng"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"promisor_refs": ["actor.jiheng"], "beneficiary_ref": "location.archive", "terms": "绝不销毁证词", "state": "open"}},
+      {"id": "redline.luorui.troupe", "kind": "commitment", "title": "不拿团员冒险", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.luorui"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"promisor_refs": ["actor.luorui"], "beneficiary_ref": "goal.luorui.reopen", "terms": "绝不拿现役团员冒险", "state": "open"}},
+      {"id": "redline.shenlu.informant", "kind": "commitment", "title": "保护幸存儿童", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.shenlu"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"promisor_refs": ["actor.shenlu"], "beneficiary_ref": "actor.ayan", "terms": "不在未经同意时说出幸存儿童身份", "state": "open"}},
+      {"id": "redline.baitang.no_blood", "kind": "commitment", "title": "债务不见血", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.baitang"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"promisor_refs": ["actor.baitang"], "beneficiary_ref": "goal.baitang.fund", "terms": "不允许任何人为债务流血", "state": "open"}},
+      {"id": "redline.ayan.workers", "kind": "commitment", "title": "不出卖工人", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.ayan"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"promisor_refs": ["actor.ayan"], "beneficiary_ref": "goal.ayan.workers", "terms": "绝不出卖任何工人证人", "state": "open"}},
+
+      {"id": "relationship.jiheng_luorui", "kind": "relationship", "title": "纪衡与洛芮", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.jiheng", "to_ref": "actor.luorui", "rating": -2, "history": ["纪衡替洛芮父亲整理账本"], "last_cause": "campaign_start"}},
+      {"id": "relationship.luorui_shenlu", "kind": "relationship", "title": "洛芮与申鹭", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.luorui", "to_ref": "actor.shenlu", "rating": -3, "history": ["十年未以母女相称"], "last_cause": "campaign_start"}},
+      {"id": "relationship.shenlu_baitang", "kind": "relationship", "title": "申鹭与白棠", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.shenlu", "to_ref": "actor.baitang", "rating": -1, "history": ["白棠长期资助剧团"], "last_cause": "campaign_start"}},
+      {"id": "relationship.baitang_ayan", "kind": "relationship", "title": "白棠与阿砚", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.baitang", "to_ref": "actor.ayan", "rating": -2, "history": ["白棠让阿砚一家失去住处"], "last_cause": "campaign_start"}},
+      {"id": "relationship.ayan_jiheng", "kind": "relationship", "title": "阿砚与纪衡", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.ayan", "to_ref": "actor.jiheng", "rating": -3, "history": ["阿砚多年拒绝与纪衡说话"], "last_cause": "campaign_start"}},
+      {"id": "relationship.nara_luorui", "kind": "relationship", "title": "娜拉与洛芮", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.nara"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.nara", "to_ref": "actor.luorui", "rating": 0, "history": ["首次采访"], "last_cause": "campaign_start"}},
+      {"id": "relationship.tao_ayan", "kind": "relationship", "title": "陶临与阿砚", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"actor_id": "actor.tao"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"from_ref": "actor.tao", "to_ref": "actor.ayan", "rating": 0, "history": ["共同检查东门"], "last_cause": "campaign_start"}},
+
+      {"id": "arc.jiheng", "kind": "profile:character_arc", "title": "纪衡人物弧", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.jiheng"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"actor_ref": "actor.jiheng", "stage": "guarded", "public_goal": "保全档案", "private_motive_ref": "secret.jiheng.signature", "red_line_refs": ["redline.jiheng.testimony"], "false_belief_ref": "belief.jiheng.luorui", "relationship_refs": ["relationship.jiheng_luorui", "relationship.ayan_jiheng"], "evidence_beats": []}},
+      {"id": "arc.luorui", "kind": "profile:character_arc", "title": "洛芮人物弧", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.luorui"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"actor_ref": "actor.luorui", "stage": "guarded", "public_goal": "安全重开", "private_motive_ref": "secret.luorui.confession", "red_line_refs": ["redline.luorui.troupe"], "false_belief_ref": "belief.luorui.shenlu", "relationship_refs": ["relationship.jiheng_luorui", "relationship.luorui_shenlu"], "evidence_beats": []}},
+      {"id": "arc.shenlu", "kind": "profile:character_arc", "title": "申鹭人物弧", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.shenlu"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"actor_ref": "actor.shenlu", "stage": "guarded", "public_goal": "诚实纪念", "private_motive_ref": "secret.shenlu.child", "red_line_refs": ["redline.shenlu.informant"], "false_belief_ref": "belief.shenlu.luorui", "relationship_refs": ["relationship.luorui_shenlu", "relationship.shenlu_baitang"], "evidence_beats": []}},
+      {"id": "arc.baitang", "kind": "profile:character_arc", "title": "白棠人物弧", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.baitang"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"actor_ref": "actor.baitang", "stage": "guarded", "public_goal": "清偿旧债", "private_motive_ref": "secret.baitang.deed", "red_line_refs": ["redline.baitang.no_blood"], "false_belief_ref": "belief.baitang.archive", "relationship_refs": ["relationship.shenlu_baitang", "relationship.baitang_ayan"], "evidence_beats": []}},
+      {"id": "arc.ayan", "kind": "profile:character_arc", "title": "阿砚人物弧", "status": "active", "revision": 0, "audience": {"scope": "facilitator"}, "controller": {"actor_id": "actor.ayan"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"actor_ref": "actor.ayan", "stage": "guarded", "public_goal": "工人安全", "private_motive_ref": "secret.ayan.witness", "red_line_refs": ["redline.ayan.workers"], "false_belief_ref": "belief.ayan.jiheng", "relationship_refs": ["relationship.baitang_ayan", "relationship.ayan_jiheng"], "evidence_beats": []}},
+
+      {"id": "clock.truth", "kind": "clock", "title": "共同真相", "status": "active", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"current": 0, "maximum": 5, "milestones": ["签名", "孩子", "地契", "警报", "东门"]}}
+    ],
+    "actor_knowledge": [
+      {"action": "add", "actor_id": "actor.nara", "knowledge_key": "echo-manor.nara.father_method", "proposition": "父亲当年逼迫阿砚作证，导致证词撤回。", "epistemic_status": "known", "confidence": 3, "cause": "private_background", "disclosure_scope": "owner"},
+      {"action": "add", "actor_id": "actor.tao", "knowledge_key": "echo-manor.tao.altered_plan", "proposition": "导师保存的图纸显示东门受力结构曾被人为改动。", "epistemic_status": "known", "confidence": 3, "cause": "private_background", "disclosure_scope": "owner"}
+    ]
+  }
+}

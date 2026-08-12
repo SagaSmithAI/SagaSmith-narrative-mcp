@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "characters": {
+    "actor.jiheng": {
+      "public_goal_ref": "goal.jiheng.archive",
+      "private_motive_ref": "secret.jiheng.signature",
+      "red_line_refs": ["redline.jiheng.testimony"],
+      "relationship_refs": ["relationship.jiheng_luorui", "relationship.ayan_jiheng"],
+      "voice_markers": ["先记日期", "按档案说"],
+      "private_tokens": ["锁门令是我签的"],
+      "initial_belief": "luorui_will_destroy_archive",
+      "allowed_belief_transitions": [["luorui_will_destroy_archive", "luorui_wants_truth_preserved"]],
+      "stage_order": ["guarded", "pressured", "committed"]
+    },
+    "actor.luorui": {
+      "public_goal_ref": "goal.luorui.reopen",
+      "private_motive_ref": "secret.luorui.confession",
+      "red_line_refs": ["redline.luorui.troupe"],
+      "relationship_refs": ["relationship.jiheng_luorui", "relationship.luorui_shenlu"],
+      "voice_markers": ["先把灯点亮", "我不接受含糊"],
+      "private_tokens": ["我要逼母亲亲口承认"],
+      "initial_belief": "shenlu_sabotaged_father",
+      "allowed_belief_transitions": [["shenlu_sabotaged_father", "shenlu_protected_a_child"]],
+      "stage_order": ["guarded", "pressured", "committed"]
+    },
+    "actor.shenlu": {
+      "public_goal_ref": "goal.shenlu.memorial",
+      "private_motive_ref": "secret.shenlu.child",
+      "red_line_refs": ["redline.shenlu.informant"],
+      "relationship_refs": ["relationship.luorui_shenlu", "relationship.shenlu_baitang"],
+      "voice_markers": ["听停顿", "台词之外"],
+      "private_tokens": ["躲在道具箱里的孩子是阿砚"],
+      "initial_belief": "luorui_seeks_revenge",
+      "allowed_belief_transitions": [["luorui_seeks_revenge", "luorui_can_choose_mercy"]],
+      "stage_order": ["guarded", "pressured", "committed"]
+    },
+    "actor.baitang": {
+      "public_goal_ref": "goal.baitang.fund",
+      "private_motive_ref": "secret.baitang.deed",
+      "red_line_refs": ["redline.baitang.no_blood"],
+      "relationship_refs": ["relationship.shenlu_baitang", "relationship.baitang_ayan"],
+      "voice_markers": ["账要平", "代价写清"],
+      "private_tokens": ["地契在火灾当夜被我调包"],
+      "initial_belief": "archive_is_counterfeit",
+      "allowed_belief_transitions": [["archive_is_counterfeit", "archive_proves_my_fraud"]],
+      "stage_order": ["guarded", "pressured", "committed"]
+    },
+    "actor.ayan": {
+      "public_goal_ref": "goal.ayan.workers",
+      "private_motive_ref": "secret.ayan.witness",
+      "red_line_refs": ["redline.ayan.workers"],
+      "relationship_refs": ["relationship.baitang_ayan", "relationship.ayan_jiheng"],
+      "voice_markers": ["我只说亲眼见的", "门轴不会撒谎"],
+      "private_tokens": ["我看见纪衡亲手锁了东门"],
+      "initial_belief": "jiheng_wanted_people_trapped",
+      "allowed_belief_transitions": [["jiheng_wanted_people_trapped", "jiheng_obeyed_a_forged_alarm"]],
+      "stage_order": ["guarded", "pressured", "committed"]
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "schema_version": 1,
+  "fixture_id": "echo-manor-voices.long-campaign",
+  "authorship": "self-authored",
+  "license": "Apache-2.0",
+  "distribution": "public",
+  "contains_private_source_material": false,
+  "sources": [
+    {
+      "id": "echo-manor-voices.original-design",
+      "type": "self-authored",
+      "citation": "SagaSmith narrative regression fixture",
+      "license": "Apache-2.0",
+      "evidence_checked": true
+    }
+  ],
+  "copyright_boundary": "No third-party setting, character, rulebook, or module text is included."
+}

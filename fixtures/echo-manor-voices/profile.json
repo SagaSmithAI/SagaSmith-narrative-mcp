@@ -1,0 +1,68 @@
+{
+  "id": "echo-manor-voices.profile",
+  "version": "1.0.0",
+  "title": "复杂角色演出 Level 0 档案",
+  "mechanics_level": 0,
+  "capabilities": ["character_performance", "multi_audience", "npc_conversation"],
+  "authority": {
+    "facilitator_roles": ["owner", "dm"],
+    "player_controls_owned_actor": true,
+    "audience_scopes": ["table", "facilitator", "actor"],
+    "conflict_is_available": false,
+    "semantic_settlement": "Agent selects character choices and explicit audiences; MCP validates authority and commits only declared state."
+  },
+  "actor_schema": {
+    "type": "object",
+    "required": ["dramatic_role", "public_goal", "private_motive", "red_lines", "false_beliefs", "voice", "relationship_history", "arc_stage"],
+    "properties": {
+      "dramatic_role": {"type": "string", "minLength": 1},
+      "public_goal": {"type": "string", "minLength": 1},
+      "private_motive": {"type": "string", "minLength": 1},
+      "red_lines": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+      "false_beliefs": {"type": "array", "items": {"type": "string"}},
+      "voice": {
+        "type": "object",
+        "required": ["cadence", "markers"],
+        "properties": {
+          "cadence": {"type": "string"},
+          "markers": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+        }
+      },
+      "relationship_history": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+      "arc_stage": {"type": "string", "enum": ["guarded", "pressured", "reconsidering", "committed"]}
+    },
+    "additionalProperties": true
+  },
+  "record_extensions": {
+    "profile:character_arc": {
+      "required_data": ["actor_ref", "stage", "public_goal", "private_motive_ref", "red_line_refs", "false_belief_ref", "relationship_refs", "evidence_beats"],
+      "invariant": "Stage changes require an explicit performance beat and never regress."
+    },
+    "relationship": {
+      "required_data": ["from_ref", "to_ref", "rating", "history", "last_cause"],
+      "invariant": "Every rating change cites a committed event."
+    },
+    "goal": {
+      "required_data": ["owner_ref", "statement", "state"],
+      "invariant": "Public goal state changes only by explicit settlement."
+    },
+    "secret": {
+      "required_data": ["holder_ref", "proposition", "consent"],
+      "invariant": "Private motives remain private until explicit consent."
+    },
+    "status": {
+      "required_data": ["subject_ref", "belief", "confidence", "revisable"],
+      "invariant": "Belief revision cites an allowed evidence edge."
+    }
+  },
+  "mechanics": [],
+  "sources": [
+    {
+      "id": "echo-manor-voices.profile-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/echo-manor-voices/profile.json"
+    }
+  ]
+}

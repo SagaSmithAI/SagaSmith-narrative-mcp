@@ -1,4 +1,4 @@
-"""Execute both original long-campaign route specifications concurrently."""
+"""Execute every original long-campaign route specification concurrently."""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from sagasmith_narrative_mcp.fixtures import load_fixture
 from sagasmith_narrative_mcp.route_dsl import (
     MISSING,
     OperatorRegistry,
+    PerformanceOracle,
     RouteDocument,
     RouteInterpreter,
     RouteLoader,
@@ -99,6 +100,12 @@ class StdioRouteBackend:
         self.private_proposals: dict[str, str] = {}
         self.director_private_proposals = 0
         self.last_session_principal = self.default_principal
+        performance_contract = document.data.get("performance_contract")
+        self.performance = PerformanceOracle(
+            RouteLoader.reference(document, str(performance_contract))
+            if performance_contract
+            else None
+        )
         module = RouteLoader.reference(document, "module.json")
         self.scenes = {
             str(item["id"]): item for item in module.get("content", {}).get("scenes", [])
@@ -440,6 +447,7 @@ class StdioRouteBackend:
         result = await self.call(
             tool, args, principal=selected_principal, write=self._is_write(tool)
         )
+        self.performance.observe(action)
         if tool == "npc_conversation" and action.get("action") == "open":
             conversation = result.get("conversation") or {}
             conversation_id = str(conversation.get("id") or "")
@@ -932,6 +940,7 @@ class StdioRouteBackend:
             "fabricated_tool_results": 0,
             "whole_skill_file_returns": self.skill_whole_file_returns,
             "director_private_proposals": self.director_private_proposals,
+            **self.performance.metrics(),
         }
 
 
@@ -1000,28 +1009,49 @@ async def run_fixture(fixture_path: Path, output_root: Path) -> dict[str, Any]:
 
 
 async def main_async(output: Path) -> list[dict[str, Any]]:
-    fixtures = [ROOT / "fixtures" / "ash-harbor", ROOT / "fixtures" / "moss-road-seasons"]
+    fixtures = sorted(
+        path
+        for path in (ROOT / "fixtures").iterdir()
+        if path.is_dir() and (path / "manifest.json").is_file() and (path / "route.json").is_file()
+    )
+    if len(fixtures) < 3:
+        raise RuntimeError("the regression requires all three original campaign fixtures")
     summaries = await asyncio.gather(*(run_fixture(path, output) for path in fixtures))
-    # Cross-fixture assertions run only after both real sessions finish.  The
-    # evidence is the two independent stdio process groups, database homes,
+    # Cross-fixture assertions run only after all real sessions finish.  The
+    # evidence is the independent stdio process groups, database homes,
     # campaign bindings, tool timelines, and per-route counters.
     distinct_campaigns = len({item["campaign_id"] for item in summaries}) == len(summaries)
-    ash, moss = summaries
+    by_fixture = {str(item["fixture_id"]): item for item in summaries}
+    ash = by_fixture["ash-harbor"]
+    moss = by_fixture["moss-road-seasons"]
+    echo = by_fixture["echo-manor-voices"]
+    serialized_timelines = {
+        fixture_id: json.dumps(item["tool_timeline"])
+        for fixture_id, item in by_fixture.items()
+    }
     parallel_checks = [
         distinct_campaigns,
-        distinct_campaigns
-        and all(item["protocol"] == "real-stdio-client-session" for item in summaries),
-        distinct_campaigns,
-        ash["campaign_id"] not in json.dumps(moss["tool_timeline"]),
-        moss["metrics"]["random_stream_cursor_delta"] == 0,
+        all(item["protocol"] == "real-stdio-client-session" for item in summaries),
+        all(
+            item["campaign_id"] not in serialized_timelines[other_id]
+            for fixture_id, item in by_fixture.items()
+            for other_id in by_fixture
+            if other_id != fixture_id
+        ),
+        moss["metrics"]["random_stream_cursor_delta"] == 0
+        and echo["metrics"]["random_stream_cursor_delta"] == 0,
         ash["metrics"]["conflict_tools_visible"] > 0
-        and moss["metrics"]["conflict_tools_visible"] == 0,
-        ash["notification_count"] > 0 and moss["notification_count"] > 0,
+        and moss["metrics"]["conflict_tools_visible"] == 0
+        and echo["metrics"]["conflict_tools_visible"] == 0,
+        all(item["notification_count"] > 0 for item in summaries),
+        echo["metrics"]["performance_private_beats"] >= 16
+        and echo["metrics"]["private_motive_leaks"] == 0,
     ]
-    moss["parallel_assertions_declared"] = len(parallel_checks)
-    moss["parallel_assertions_passed"] = sum(parallel_checks)
+    for summary in summaries:
+        summary["parallel_assertions_declared"] = len(parallel_checks)
+        summary["parallel_assertions_passed"] = sum(parallel_checks)
     if not all(parallel_checks):
-        moss["failures"].append(
+        echo["failures"].append(
             {
                 "scope": "parallel_assertions",
                 "type": "AssertionError",

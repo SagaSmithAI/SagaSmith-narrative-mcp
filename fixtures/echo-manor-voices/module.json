@@ -1,0 +1,39 @@
+{
+  "id": "echo-manor-voices.module",
+  "version": "1.0.0",
+  "title": "回声公馆：五种沉默",
+  "kind": "module",
+  "profile_requirements": [
+    {"id": "echo-manor-voices.profile", "version": "1.0.0", "capabilities": ["character_performance", "multi_audience", "npc_conversation"], "forbidden_capabilities": ["conflict", "mechanics"]}
+  ],
+  "dependencies": [{"id": "echo-manor-voices.seed", "version": "1.0.0"}],
+  "sources": [
+    {"id": "echo-manor-voices.module-source", "type": "self-authored", "license": "Apache-2.0", "distribution": "public", "citation": "fixtures/echo-manor-voices/module.json"}
+  ],
+  "rights": {"license": "Apache-2.0", "distribution": "public", "contains_private_source_material": false},
+  "review": {"agent_finalization": true, "reviewer": "fixture-author", "evidence_checked": true, "mechanical_validation": "required"},
+  "content": {
+    "session_equivalent_count": 15,
+    "scenes": [
+      {"id": "scene.01_archive_date", "session_equivalent": 1, "title": "档案的日期", "location_ref": "location.archive", "participants": ["actor.nara", "actor.jiheng"], "purpose": "纪衡以档案口吻守住签名秘密。", "settlement_targets": ["arc.jiheng", "relationship.jiheng_luorui"], "exit": {"event_type": "echo-manor.jiheng_guarded"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.02_house_lights", "session_equivalent": 1, "title": "先把灯点亮", "location_ref": "location.stage", "participants": ["actor.nara", "actor.luorui"], "purpose": "洛芮表达重开目标并压住对母亲的逼问。", "settlement_targets": ["arc.luorui", "relationship.luorui_shenlu"], "exit": {"event_type": "echo-manor.luorui_guarded"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.03_unspoken_blocking", "session_equivalent": 1, "title": "台词之外", "location_ref": "location.stage", "participants": ["actor.nara", "actor.shenlu"], "purpose": "申鹭用调度术语保护幸存儿童身份。", "settlement_targets": ["arc.shenlu", "relationship.luorui_shenlu"], "exit": {"event_type": "echo-manor.shenlu_guarded"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.04_balanced_ledger", "session_equivalent": 1, "title": "账要平", "location_ref": "location.archive", "participants": ["actor.tao", "actor.baitang"], "purpose": "白棠把资助包装成对价。", "settlement_targets": ["arc.baitang", "relationship.shenlu_baitang"], "exit": {"event_type": "echo-manor.baitang_guarded"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.05_east_hinge", "session_equivalent": 1, "title": "东门门轴", "location_ref": "location.stage", "participants": ["actor.tao", "actor.ayan"], "purpose": "阿砚只凭物证陈述对纪衡的怀疑。", "settlement_targets": ["arc.ayan", "relationship.ayan_jiheng"], "exit": {"event_type": "echo-manor.ayan_guarded"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.06_signature_pressure", "session_equivalent": 1, "title": "签名与警报页", "location_ref": "location.archive", "participants": ["actor.nara", "actor.jiheng", "actor.luorui"], "purpose": "洛芮承诺保全档案，使纪衡修正错误信念。", "settlement_targets": ["arc.jiheng", "belief.jiheng.luorui", "clock.truth"], "exit": {"event_type": "echo-manor.jiheng_reconsiders"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.07_childs_shadow", "session_equivalent": 1, "title": "道具箱的影子", "location_ref": "location.stage", "participants": ["actor.nara", "actor.luorui", "actor.shenlu"], "purpose": "洛芮看到申鹭保护孩子的证据。", "settlement_targets": ["arc.luorui", "belief.luorui.shenlu", "relationship.luorui_shenlu"], "exit": {"event_type": "echo-manor.luorui_reconsiders"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.08_mercy_rehearsal", "session_equivalent": 1, "title": "宽恕的排练", "location_ref": "location.stage", "participants": ["actor.nara", "actor.shenlu", "actor.luorui"], "purpose": "申鹭听见洛芮允许阿砚决定公开方式。", "settlement_targets": ["arc.shenlu", "belief.shenlu.luorui", "relationship.luorui_shenlu"], "exit": {"event_type": "echo-manor.shenlu_reconsiders"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.09_deed_watermark", "session_equivalent": 1, "title": "地契水印", "location_ref": "location.archive", "participants": ["actor.tao", "actor.baitang", "actor.jiheng"], "purpose": "白棠确认档案能证明自己的调包。", "settlement_targets": ["arc.baitang", "belief.baitang.archive", "clock.truth"], "exit": {"event_type": "echo-manor.baitang_reconsiders"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.10_forged_alarm", "session_equivalent": 1, "title": "伪造的警报", "location_ref": "location.stage", "participants": ["actor.tao", "actor.ayan", "actor.jiheng"], "purpose": "阿砚发现纪衡服从的是被调包的警报。", "settlement_targets": ["arc.ayan", "belief.ayan.jiheng", "relationship.ayan_jiheng"], "exit": {"event_type": "echo-manor.ayan_reconsiders"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.11_archive_confession", "session_equivalent": 1, "title": "纪衡的完整证词", "location_ref": "location.archive", "participants": ["actor.nara", "actor.jiheng", "actor.ayan"], "purpose": "纪衡公开承担签名责任但不销毁他人证词。", "settlement_targets": ["arc.jiheng", "secret.jiheng.signature", "relationship.ayan_jiheng"], "exit": {"event_type": "echo-manor.jiheng_commits"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.12_heirs_choice", "session_equivalent": 1, "title": "继承人的选择", "location_ref": "location.stage", "participants": ["actor.nara", "actor.luorui", "actor.shenlu"], "purpose": "洛芮放弃逼供并把披露权交给阿砚。", "settlement_targets": ["arc.luorui", "secret.luorui.confession", "relationship.luorui_shenlu"], "exit": {"event_type": "echo-manor.luorui_commits"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.13_directors_pause", "session_equivalent": 1, "title": "导演的停顿", "location_ref": "location.stage", "participants": ["actor.nara", "actor.shenlu", "actor.ayan"], "purpose": "申鹭在阿砚同意后才确认幸存儿童身份。", "settlement_targets": ["arc.shenlu", "secret.shenlu.child", "relationship.luorui_shenlu"], "exit": {"event_type": "echo-manor.shenlu_commits"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.14_price_of_deed", "session_equivalent": 1, "title": "地契的代价", "location_ref": "location.archive", "participants": ["actor.tao", "actor.baitang", "actor.ayan"], "purpose": "白棠选择归还地契而不以暴力维持交易。", "settlement_targets": ["arc.baitang", "secret.baitang.deed", "relationship.baitang_ayan"], "exit": {"event_type": "echo-manor.baitang_commits"}, "source": {"type": "self-authored", "license": "Apache-2.0"}},
+      {"id": "scene.15_open_east_door", "session_equivalent": 1, "title": "打开东门", "location_ref": "location.stage", "participants": ["actor.nara", "actor.tao", "actor.ayan", "actor.jiheng", "actor.luorui", "actor.shenlu", "actor.baitang"], "purpose": "阿砚完成证词并由众人共同决定公馆未来。", "settlement_targets": ["arc.ayan", "secret.ayan.witness", "clock.truth", "location.echo_manor"], "exit": {"event_type": "echo-manor.campaign_ending"}, "source": {"type": "self-authored", "license": "Apache-2.0"}}
+    ],
+    "endings": [
+      {"id": "ending.open_archive", "title": "公开档案与安全重开", "legal_when": {"all": [{"record": "clock.truth", "path": "data.current", "operator": "eq", "value": 5}, {"record": "location.echo_manor", "path": "status", "operator": "eq", "value": "reopened"}]}},
+      {"id": "ending.witness_trust", "title": "暂缓重开并建立证人信托", "legal_when": {"all": [{"record": "clock.truth", "path": "data.current", "operator": "eq", "value": 5}, {"record": "location.echo_manor", "path": "status", "operator": "eq", "value": "witness_trust"}]}}
+    ]
+  }
+}

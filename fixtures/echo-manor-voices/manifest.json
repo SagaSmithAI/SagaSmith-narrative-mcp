@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "fixture_id": "echo-manor-voices.long-campaign",
+  "title": "回声公馆：五种沉默",
+  "fixture_kind": "complex_character_performance_campaign",
+  "equivalent_sessions": 15,
+  "license": "Apache-2.0",
+  "authorship": "self-authored",
+  "files": {
+    "profile": "profile.json",
+    "campaign_seed": "campaign-seed.json",
+    "module": "module.json",
+    "primary_route": "route.json",
+    "performance_contract": "character-contracts.json",
+    "provenance": "provenance.json"
+  },
+  "required_capabilities": ["character_performance", "multi_audience", "npc_conversation"],
+  "forbidden_capabilities": ["conflict", "mechanics"],
+  "coverage": [
+    "five_persistent_npcs",
+    "public_goals",
+    "private_motives",
+    "red_lines",
+    "false_beliefs",
+    "relationship_history",
+    "stable_voice_markers",
+    "isolated_npc_workers",
+    "private_proposal_publication_split",
+    "belief_revision_with_cause",
+    "relationship_arcs",
+    "actor_knowledge_isolation",
+    "fifteen_sessions",
+    "branch_alternate_ending",
+    "dynamic_tools",
+    "real_stdio_host",
+    "parallel_campaign_isolation"
+  ],
+  "checksum_policy": "compute canonical SHA-256 through the public profile and Pack validators"
+}
