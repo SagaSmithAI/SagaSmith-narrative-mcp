@@ -1,0 +1,184 @@
+{
+  "id": "ash-harbor.module",
+  "version": "1.0.0",
+  "title": "灰港同盟：风暴前夜",
+  "kind": "module",
+  "profile_requirements": [
+    {"id": "ash-harbor.profile", "version": "1.0.0", "capabilities": ["conflict", "downtime", "mechanics", "world_turn"]}
+  ],
+  "dependencies": [
+    {"id": "ash-harbor.seed", "version": "1.0.0"}
+  ],
+  "sources": [
+    {
+      "id": "ash-harbor.module-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/ash-harbor/module.json"
+    }
+  ],
+  "rights": {
+    "license": "Apache-2.0",
+    "distribution": "public",
+    "contains_private_source_material": false
+  },
+  "review": {
+    "agent_finalization": true,
+    "reviewer": "fixture-author",
+    "evidence_checked": true,
+    "mechanical_validation": "required"
+  },
+  "content": {
+    "session_equivalent_count": 10,
+    "scenes": [
+      {
+        "id": "scene.01_floodgate_embers",
+        "session_equivalent": 1,
+        "title": "潮闸余火",
+        "location_ref": "location.floodgate",
+        "participants": ["actor.mara", "actor.ivo"],
+        "purpose": "建立三方冲突，验证传闻与公共事件。",
+        "entry": {"phase": "play", "requires": ["rumor.night_manifest"]},
+        "settlement_targets": ["clock.crackdown", "relationship.mara_union"],
+        "exit": {"event_type": "ash-harbor.floodgate_testimony"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.02_glass_auction",
+        "session_equivalent": 1,
+        "title": "玻璃市场暗拍",
+        "location_ref": "location.glassmarket",
+        "participants": ["actor.mara", "actor.ivo", "actor.vey"],
+        "purpose": "验证骰池、谈判筹码与角色受众。",
+        "entry": {"requires_event": "ash-harbor.floodgate_testimony"},
+        "settlement_targets": ["resource.leverage", "faction.glass_office"],
+        "exit": {"event_type": "ash-harbor.manifest_acquired"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.03_night_ferry",
+        "session_equivalent": 1,
+        "title": "夜船穿行",
+        "location_ref": "location.greyharbor",
+        "participants": ["actor.ivo", "actor.serin"],
+        "purpose": "验证可选 conflict 及其与场景变更的互斥。",
+        "entry": {"requires_event": "ash-harbor.manifest_acquired"},
+        "conflict": {"optional": true, "objective": "在巡船合围前带回一只密封记录箱"},
+        "settlement_targets": ["clock.vault_breach", "clock.crackdown"],
+        "exit": {"event_type": "ash-harbor.ferry_box_recovered"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.04_quiet_repairs",
+        "session_equivalent": 1,
+        "title": "安静的修补",
+        "location_ref": "location.floodgate",
+        "participants": ["actor.mara", "actor.ivo"],
+        "purpose": "验证 downtime 的资源回复、strain 结算与长期项目。",
+        "entry": {"activity": "downtime"},
+        "settlement_targets": ["resource.crew_coin", "clock.vault_breach"],
+        "exit": {"event_type": "ash-harbor.repairs_complete"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.05_strike_assembly",
+        "session_equivalent": 1,
+        "title": "罢工议会",
+        "location_ref": "location.floodgate",
+        "participants": ["actor.mara", "actor.ivo", "actor.vey"],
+        "purpose": "验证阵营与关系变化，但不把语义选择交给 MCP。",
+        "entry": {"requires_event": "ash-harbor.repairs_complete"},
+        "settlement_targets": ["faction.tide_union", "relationship.mara_union", "clock.crackdown"],
+        "exit": {"event_type": "ash-harbor.union_mandate"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.06_world_turn",
+        "session_equivalent": 1,
+        "title": "风向变化",
+        "location_ref": "location.greyharbor",
+        "participants": [],
+        "purpose": "验证有证据的 world-turn 一次原子推进多个时钟和阵营。",
+        "entry": {"activity": "world_turn", "requires_role": "facilitator"},
+        "settlement_targets": ["clock.stormfront", "clock.crackdown", "faction.gate_compact"],
+        "exit": {"event_type": "ash-harbor.storm_warning"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.07_shipwright_parley",
+        "session_equivalent": 1,
+        "title": "船匠的三次敲击",
+        "location_ref": "location.floodgate",
+        "participants": ["actor.ivo", "actor.serin"],
+        "purpose": "验证持久 NPC 隔离对话、私有 proposal 与可发布结论。",
+        "entry": {"requires_event": "ash-harbor.storm_warning", "npc_conversation": true},
+        "settlement_targets": ["relationship.ivo_serin", "secret.first_charter"],
+        "exit": {"event_type": "ash-harbor.deadlight_route_shared"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.08_deadlight_vault",
+        "session_equivalent": 1,
+        "title": "燃尽灯塔的密库",
+        "location_ref": "location.deadlight",
+        "participants": ["actor.mara", "actor.ivo", "actor.serin"],
+        "purpose": "验证私有事实变为明确 actor knowledge，但不自动向 table 公开。",
+        "entry": {"requires_event": "ash-harbor.deadlight_route_shared"},
+        "settlement_targets": ["clock.vault_breach", "secret.first_charter", "resource.leverage"],
+        "exit": {"event_type": "ash-harbor.charter_recovered"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.09_last_downtime",
+        "session_equivalent": 1,
+        "title": "最后一次低潮",
+        "location_ref": "location.glassmarket",
+        "participants": ["actor.mara", "actor.ivo"],
+        "purpose": "验证第二次 downtime、会话摘要与结局前 snapshot。",
+        "entry": {"activity": "downtime", "requires_event": "ash-harbor.charter_recovered"},
+        "settlement_targets": ["resource.crew_coin", "resource.leverage"],
+        "exit": {"event_type": "ash-harbor.council_ready", "snapshot_label": "before-storm-council"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.10_storm_council",
+        "session_equivalent": 1,
+        "title": "风暴议会",
+        "location_ref": "location.floodgate",
+        "participants": ["actor.mara", "actor.ivo", "actor.serin", "actor.vey"],
+        "purpose": "验证合法结局、受众公开、branch replay 和恢复。",
+        "entry": {"requires_event": "ash-harbor.council_ready"},
+        "settlement_targets": ["faction.tide_union", "faction.glass_office", "faction.gate_compact", "clock.stormfront"],
+        "exit": {"event_type": "ash-harbor.campaign_ending"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      }
+    ],
+    "endings": [
+      {
+        "id": "ending.free_compact",
+        "title": "自由港盟约",
+        "legal_when": {
+          "all": [
+            {"record": "clock.vault_breach", "path": "data.current", "operator": "eq", "value": 6},
+            {"record": "relationship.mara_union", "path": "data.rating", "operator": "gte", "value": 2},
+            {"record": "resource.leverage", "path": "data.current", "operator": "gte", "value": 4},
+            {"fact": "ash-harbor.charter.public", "disclosure_scope": "public"}
+          ]
+        },
+        "result": "三方以初代章程重建共治议会，玻璃署放弃单方戒严。"
+      },
+      {
+        "id": "ending.iron_curfew",
+        "title": "铁幕戒严",
+        "legal_when": {
+          "any": [
+            {"record": "clock.crackdown", "path": "data.current", "operator": "eq", "value": 6},
+            {"record": "resource.leverage", "path": "data.current", "operator": "lt", "value": 2}
+          ]
+        },
+        "result": "玻璃署在风暴中接管港口，工会转入地下继续长线斗争。"
+      }
+    ]
+  }
+}

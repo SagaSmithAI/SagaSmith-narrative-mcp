@@ -1,0 +1,523 @@
+{
+  "schema_version": 1,
+  "route_id": "moss-road-seasons.route.shared-morning",
+  "title": "苔路共同清晨主路线",
+  "equivalent_sessions": 10,
+  "runner_contract": {
+    "transport": "real_mcp",
+    "host": "real_native_tool_refresh",
+    "binding": "refresh_before_every_context_sensitive_call",
+    "write_arguments": [
+      "campaign_id",
+      "expected_revision",
+      "expected_branch_id",
+      "idempotency_key"
+    ],
+    "record_patch_semantics": "load the current full record, apply JSON Merge Patch, retain immutable identity fields, and send its current revision as expected_record_revision",
+    "seed_materialization": "create every actor and record from campaign-seed.json through public MCP tools after both Packs are active",
+    "element_grant_semantics": "materialize campaign-seed element_stewardship through access_change, rotate grants explicitly, and require call-time controller authorization",
+    "no_internal_calls": true,
+    "no_fabricated_tool_results": true,
+    "random_draws_expected": 0,
+    "parallel_fixture": "ash-harbor.long-campaign"
+  },
+  "principals": {
+    "lian": "principal.lian",
+    "seli": "principal.seli",
+    "uma": "principal.uma",
+    "observer": "principal.observer"
+  },
+  "setup": [
+    {
+      "id": "setup.discover_skills",
+      "principal": "lian",
+      "tool": "skill_query",
+      "actions": ["list", "search", "get_section"],
+      "assert": [
+        {"skill_id": "setup-narrative-campaign", "operator": "visible"},
+        {"skill_id": "backtest-recover-campaign", "operator": "visible"},
+        {"metric": "whole_skill_file_returns", "operator": "eq", "value": 0}
+      ]
+    },
+    {
+      "id": "setup.create_campaign",
+      "principal": "lian",
+      "tool": "campaign_setup",
+      "action": "create",
+      "input": {"name": "苔路四季", "description": "10-session compressed original Level 0 regression"},
+      "assert": [
+        {"path": "phase", "operator": "eq", "value": "lobby"},
+        {"path": "system_id", "operator": "eq", "value": "narrative"},
+        {"binding_path": "principal_id", "operator": "eq", "value": "principal.lian"}
+      ]
+    },
+    {
+      "id": "setup.profile_lifecycle",
+      "principal": "lian",
+      "tool": "profile_change",
+      "actions": ["create_draft", "finalize", "activate"],
+      "load": "profile.json",
+      "assert": [
+        {"path": "profile.id", "operator": "eq", "value": "moss-road-seasons.profile"},
+        {"path": "profile.mechanics_level", "operator": "eq", "value": 0},
+        {"path": "profile.mechanics", "operator": "length_eq", "value": 0},
+        {"path": "profile.capabilities", "operator": "not_contains", "value": "conflict"},
+        {"path": "profile.checksum", "operator": "sha256"}
+      ]
+    },
+    {
+      "id": "setup.pack_lifecycle",
+      "principal": "lian",
+      "tool": "pack_change",
+      "for_each": ["campaign-seed.json", "module.json"],
+      "actions": ["create_draft", "finalize", "import", "activate"],
+      "assert": [
+        {"path": "status", "operator": "eq", "value": "active"},
+        {"path": "pack.rights.distribution", "operator": "eq", "value": "public"},
+        {"path": "pack.rights.contains_private_source_material", "operator": "eq", "value": false}
+      ]
+    },
+    {
+      "id": "setup.access_actors_elements_and_seed",
+      "principal": "lian",
+      "tool": "access_change",
+      "load": "campaign-seed.json#/content/principals",
+      "element_grants_from": "campaign-seed.json#/content/element_stewardship",
+      "then": {
+        "actors": "campaign-seed.json#/content/actors",
+        "records": "campaign-seed.json#/content/records",
+        "deferred_actor_knowledge": "campaign-seed.json#/content/actor_knowledge"
+      },
+      "assert": [
+        {"kind": "count", "query": "actor_query", "operator": "eq", "value": 5},
+        {"kind": "count", "query": "narrative_query", "operator": "eq", "value": 18},
+        {"metric": "campaign_dm_members", "operator": "eq", "value": 0},
+        {"element": "location.reed_ford", "principal": "seli", "operator": "can_control"},
+        {"element": "location.reed_ford", "principal": "uma", "operator": "cannot_control"}
+      ]
+    },
+    {
+      "id": "setup.enter_play",
+      "principal": "lian",
+      "tool": "game_phase",
+      "input": {"phase": "play"},
+      "then": {
+        "tool": "narrative_settle",
+        "event": {"event_type": "moss-road-seasons.background_initialized", "summary": "战役开始时每位角色只持有自己的私有背景知识。", "audience_scope": "dm"},
+        "actor_knowledge_from": "campaign-seed.json#/content/actor_knowledge"
+      },
+      "assert": [
+        {"path": "phase", "operator": "eq", "value": "play"},
+        {"tool_visible": "mechanic_resolve", "operator": "eq", "value": false},
+        {"tool_visible": "conflict_start", "operator": "eq", "value": false},
+        {"tool_visible": "conflict_query", "operator": "eq", "value": false},
+        {"tool_visible": "conflict_act", "operator": "eq", "value": false},
+        {"tool_visible": "conflict_end", "operator": "eq", "value": false},
+        {"tool_visible": "downtime_settle", "operator": "eq", "value": true},
+        {"tool_visible": "world_turn_settle", "operator": "eq", "value": true},
+        {"notification": "tools/list_changed", "operator": "count_gte", "value": 1}
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session.01",
+      "scene": "scene.01_spring_table",
+      "title": "新芽桌会",
+      "principal": "lian",
+      "active_steward_elements": ["location.lantern_home", "faction.lantern_home"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.spring_promise", "summary": "三位行路人公开答应在第一场雪前共同修好灯屋北檐。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "clock.seasons", "patch": {"data": {"current": 1, "maximum": 4, "milestones": ["spring", "summer", "autumn", "winter"], "automatic": false}}},
+            {"id": "travel_leg.lantern_to_reed", "patch": {"status": "underway", "data": {"from_ref": "location.lantern_home", "to_ref": "location.reed_ford", "state": "underway"}}}
+          ],
+          "facts": [
+            {"action": "upsert", "fact_key": "moss-road-seasons.roof.promise_public", "content": "三位行路人承诺在第一场雪前共同修好北檐。", "kind": "commitment", "subject_ref": "commitment.shared_roof", "predicate": "was_publicly_made", "disclosure_scope": "public"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.seasons", "path": "data.current", "operator": "eq", "value": 1},
+        {"record": "travel_leg.lantern_to_reed", "path": "data.state", "operator": "eq", "value": "underway"},
+        {"principal": "observer", "fact_key": "moss-road-seasons.roof.promise_public", "operator": "visible"}
+      ]
+    },
+    {
+      "id": "session.02",
+      "scene": "scene.02_reed_crossing",
+      "title": "芦渡过水",
+      "principal": "seli",
+      "active_steward_elements": ["location.reed_ford", "actor.reed_keeper"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.reed_crossed", "summary": "三人合力牵舟过渡，把一篮灯屋干粮留给了守人。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "travel_leg.lantern_to_reed", "patch": {"status": "completed", "data": {"from_ref": "location.lantern_home", "to_ref": "location.reed_ford", "state": "completed"}}},
+            {"id": "resource.community_stores", "patch": {"data": {"current": 2, "maximum": 6, "unit": "shared_basket"}}},
+            {"id": "relationship.seli_keeper", "patch": {"data": {"from_ref": "actor.seli", "to_ref": "actor.reed_keeper", "rating": 1, "promises": ["carry_true_name"]}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "travel_leg.lantern_to_reed", "path": "status", "operator": "eq", "value": "completed"},
+        {"record": "resource.community_stores", "path": "data.current", "operator": "eq", "value": 2},
+        {"record": "relationship.seli_keeper", "path": "data.rating", "operator": "eq", "value": 1}
+      ]
+    },
+    {
+      "id": "session.03",
+      "scene": "scene.03_keeper_name",
+      "title": "守人的旧名",
+      "principal": "seli",
+      "active_steward_elements": ["actor.reed_keeper"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "action": "open", "npc_actor_id": "actor.reed_keeper", "input": {"private_worker_id": "worker.reed_keeper"}, "save_result_as": "keeper_conversation"},
+        {"tool": "npc_conversation", "action": "propose", "conversation_from": "keeper_conversation", "input": {"content": "守人愿意让瑟黎记住旧名，但还没有同意向整桌公开。"}, "save_result_as": "keeper_proposal"},
+        {"tool": "npc_conversation", "action": "publish", "conversation_from": "keeper_conversation", "input": {"proposal_id_from": "keeper_proposal", "content": "守人请瑟黎在钟草原前保管一个名字。", "audience": {"scope": "actor", "actor_ids": ["actor.seli"]}}},
+        {"tool": "npc_conversation", "action": "close", "conversation_from": "keeper_conversation"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.name_entrusted", "summary": "守人把一个尚不可公开的旧名托付给瑟黎。", "audience_scope": "actor", "participants": [{"actor_id": "actor.seli", "role": "listener"}]},
+          "record_patches": [
+            {"id": "relationship.seli_keeper", "patch": {"data": {"from_ref": "actor.seli", "to_ref": "actor.reed_keeper", "rating": 2, "promises": ["carry_true_name", "ask_before_disclosure"]}}}
+          ],
+          "actor_knowledge": [
+            {"action": "add", "actor_id": "actor.seli", "knowledge_key": "moss-road-seasons.seli.disclosure_condition", "proposition": "只有守人明确同意后，瑟黎才能把旧名告诉其他人。", "epistemic_status": "known", "confidence": 3, "cause": "told_by", "disclosure_scope": "owner"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"principal": "seli", "knowledge_key": "moss-road-seasons.seli.disclosure_condition", "operator": "visible"},
+        {"principal": "uma", "knowledge_key": "moss-road-seasons.seli.disclosure_condition", "operator": "not_visible"},
+        {"principal": "observer", "record": "secret.keeper_name", "operator": "not_visible"},
+        {"conversation_status": "closed", "operator": "eq", "value": true},
+        {"metric": "director_private_proposals", "operator": "eq", "value": 0}
+      ]
+    },
+    {
+      "id": "session.04",
+      "scene": "scene.04_cloud_summer",
+      "title": "云园盛夏",
+      "principal": "uma",
+      "active_steward_elements": ["location.cloud_orchard", "actor.ori"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "world_turn_settle",
+          "summary": "乌玛描述云园进入盛夏；众人共同确认芦渡至云园的行程完成。",
+          "record_patches": [
+            {"id": "clock.seasons", "patch": {"data": {"current": 2, "maximum": 4, "milestones": ["spring", "summer", "autumn", "winter"], "automatic": false}}},
+            {"id": "travel_leg.reed_to_orchard", "patch": {"status": "completed", "data": {"from_ref": "location.reed_ford", "to_ref": "location.cloud_orchard", "state": "completed"}}},
+            {"id": "relationship.uma_ori", "patch": {"data": {"from_ref": "actor.uma", "to_ref": "actor.ori", "rating": 2, "promises": ["share_last_basket"]}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.seasons", "path": "data.current", "operator": "eq", "value": 2},
+        {"record": "travel_leg.reed_to_orchard", "path": "status", "operator": "eq", "value": "completed"},
+        {"metric": "random_stream_cursor_delta", "operator": "eq", "value": 0}
+      ]
+    },
+    {
+      "id": "session.05",
+      "scene": "scene.05_warm_rain_repairs",
+      "title": "暖雨修补",
+      "principal": "lian",
+      "active_steward_elements": ["location.lantern_home", "thread.north_eave"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "downtime_settle",
+          "summary": "三人用云园换来的木条架起北檐骨架，并把一篮果干放入共同储备。",
+          "record_patches": [
+            {"id": "resource.community_stores", "patch": {"data": {"current": 3, "maximum": 6, "unit": "shared_basket"}}},
+            {"id": "thread.north_eave", "patch": {"status": "in_progress", "data": {"state": "framed", "required_refs": ["resource.community_stores", "commitment.shared_roof"]}}},
+            {"id": "commitment.shared_roof", "patch": {"status": "in_progress", "data": {"promisor_refs": ["actor.lian", "actor.seli", "actor.uma"], "beneficiary_ref": "faction.lantern_home", "terms": "在第一场雪前共同完成北檐，并由灯屋决定剩余材料的用途。", "state": "open"}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "thread.north_eave", "path": "data.state", "operator": "eq", "value": "framed"},
+        {"record": "commitment.shared_roof", "path": "data.state", "operator": "eq", "value": "open"}
+      ]
+    },
+    {
+      "id": "session.06",
+      "scene": "scene.06_autumn_letter",
+      "title": "只给乌玛的秋信",
+      "principal": "uma",
+      "active_steward_elements": ["location.cloud_orchard", "actor.ori"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.ori_fear_shared", "summary": "小栎把对冬钟的担忧只告诉了乌玛。", "audience_scope": "actor", "participants": [{"actor_id": "actor.uma", "role": "listener"}]},
+          "actor_knowledge": [
+            {"action": "add", "actor_id": "actor.uma", "knowledge_key": "moss-road-seasons.uma.winter_request", "proposition": "小栎希望乌玛在冬至敲钟时牵着自己的手。", "epistemic_status": "known", "confidence": 3, "cause": "told_by", "disclosure_scope": "owner"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"principal": "uma", "knowledge_key": "moss-road-seasons.uma.winter_request", "operator": "visible"},
+        {"principal": "lian", "knowledge_key": "moss-road-seasons.uma.winter_request", "operator": "not_visible"},
+        {"principal": "seli", "knowledge_key": "moss-road-seasons.uma.winter_request", "operator": "not_visible"},
+        {"principal": "observer", "knowledge_key": "moss-road-seasons.uma.winter_request", "operator": "not_visible"}
+      ]
+    },
+    {
+      "id": "session.07",
+      "scene": "scene.07_first_frost",
+      "title": "初霜同行",
+      "principal": "seli",
+      "grant_rotation": {
+        "element_ref": "route.moss_road",
+        "from_principal": "principal.lian",
+        "to_principal": "principal.seli"
+      },
+      "active_steward_elements": ["route.moss_road"],
+      "actions": [
+        {"tool": "access_change", "action": "element_revoke", "principal": "lian", "target_principal_id": "principal.lian", "element_ref": "route.moss_road"},
+        {"tool": "access_change", "action": "element_grant", "principal": "lian", "target_principal_id": "principal.seli", "element_ref": "route.moss_road", "can_control": true},
+        {"tool": "access_change", "action": "element_grant", "principal": "lian", "target_principal_id": "principal.seli", "element_ref": "clock.seasons", "can_control": true, "scope": {"scene_id": "scene.07_first_frost"}},
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.frost_company", "summary": "乌玛征得小栎同意后，只把陪伴请求告诉了三位同行者。", "audience_scope": "party"},
+          "record_patches": [
+            {"id": "clock.seasons", "patch": {"data": {"current": 3, "maximum": 4, "milestones": ["spring", "summer", "autumn", "winter"], "automatic": false}}},
+            {"id": "route.moss_road", "patch": {"data": {"stops": ["location.lantern_home", "location.reed_ford", "location.cloud_orchard", "location.bell_meadow"], "seasonal_access": {"spring": "muddy", "summer": "open", "autumn": "leaf_hidden", "winter": "bell_marked"}, "current_steward": "principal.seli"}}}
+          ],
+          "actor_knowledge": [
+            {"action": "add", "actor_id": "actor.seli", "knowledge_key": "moss-road-seasons.group.ori_request", "proposition": "小栎希望乌玛陪自己在冬至敲钟。", "epistemic_status": "known", "confidence": 3, "cause": "disclosed_with_consent", "disclosure_scope": "owner"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.seasons", "path": "data.current", "operator": "eq", "value": 3},
+        {"element": "route.moss_road", "principal": "seli", "operator": "can_control"},
+        {"element": "route.moss_road", "principal": "lian", "operator": "cannot_control"},
+        {"principal": "observer", "knowledge_key": "moss-road-seasons.group.ori_request", "operator": "not_visible"}
+      ]
+    },
+    {
+      "id": "session.08",
+      "scene": "scene.08_winter_lanterns",
+      "title": "冬灯归屋",
+      "principal": "lian",
+      "active_steward_elements": ["location.lantern_home", "faction.lantern_home"],
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "world_turn_settle",
+          "summary": "灯屋进入冬季；三人完成北檐，灯屋选择把余料留给下一位需要修补的旅人。",
+          "record_patches": [
+            {"id": "clock.seasons", "patch": {"status": "completed", "data": {"current": 4, "maximum": 4, "milestones": ["spring", "summer", "autumn", "winter"], "automatic": false}}},
+            {"id": "thread.north_eave", "patch": {"status": "completed", "data": {"state": "completed", "required_refs": ["resource.community_stores", "commitment.shared_roof"]}}},
+            {"id": "commitment.shared_roof", "patch": {"status": "fulfilled", "data": {"promisor_refs": ["actor.lian", "actor.seli", "actor.uma"], "beneficiary_ref": "faction.lantern_home", "terms": "在第一场雪前共同完成北檐，并由灯屋决定剩余材料的用途。", "state": "fulfilled"}}},
+            {"id": "relationship.lian_home", "patch": {"data": {"from_ref": "actor.lian", "to_ref": "faction.lantern_home", "rating": 2, "promises": []}}}
+          ]
+        },
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.roof_completed", "summary": "第一场雪落下前，灯屋北檐完工。", "audience_scope": "public"},
+          "facts": [{"action": "upsert", "fact_key": "moss-road-seasons.roof.completed", "content": "灯屋北檐在第一场雪前完工。", "kind": "public_record", "subject_ref": "thread.north_eave", "predicate": "is_completed", "disclosure_scope": "public"}]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.seasons", "path": "data.current", "operator": "eq", "value": 4},
+        {"record": "thread.north_eave", "path": "status", "operator": "eq", "value": "completed"},
+        {"record": "commitment.shared_roof", "path": "data.state", "operator": "eq", "value": "fulfilled"},
+        {"principal": "observer", "record": "secret.keeper_name", "operator": "not_visible"}
+      ]
+    },
+    {
+      "id": "session.09",
+      "scene": "scene.09_thaw_choice",
+      "title": "解冻时的岔路",
+      "principal": "lian",
+      "actions": [
+        {"tool": "access_change", "principal": "lian", "action": "element_grant", "target_principal_id": "principal.lian", "element_ref": "status.road_welcome", "can_control": true, "scope": {"scene_id": "scene.09_thaw_choice"}},
+        {"tool": "access_change", "principal": "lian", "action": "element_grant", "target_principal_id": "principal.lian", "element_ref": "secret.keeper_name", "can_control": true, "scope": {"scene_id": "scene.09_thaw_choice"}},
+        {"tool": "access_change", "principal": "lian", "action": "element_grant", "target_principal_id": "principal.lian", "element_ref": "rumor.silent_bells", "can_control": true, "scope": {"scene_id": "scene.09_thaw_choice"}},
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "snapshot_change", "action": "create", "input": {"label": "before-bell-meadow"}},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.thaw_choice", "summary": "三位行路人决定让苔路继续欢迎所有愿意互相照看的旅人。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "status.road_welcome", "patch": {"status": "active", "data": {"scope_ref": "route.moss_road", "duration": "campaign", "tags": ["hospitality", "shared_stewardship"]}}},
+            {"id": "secret.keeper_name", "patch": {"status": "consent_to_disclose"}},
+            {"id": "rumor.silent_bells", "patch": {"status": "verified", "data": {"claim": "钟草原只会为被完整记住的名字响铃。", "truth": "accepted_by_campaign", "points_to": "location.bell_meadow"}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"snapshot_label": "before-bell-meadow", "operator": "exists"},
+        {"record": "secret.keeper_name", "path": "status", "operator": "eq", "value": "consent_to_disclose"},
+        {"tool_visible": "conflict_start", "operator": "eq", "value": false}
+      ]
+    },
+    {
+      "id": "session.10",
+      "scene": "scene.10_bell_meadow",
+      "title": "钟草原的共同清晨",
+      "principal": "lian",
+      "active_steward_elements": ["location.bell_meadow", "actor.reed_keeper", "actor.ori"],
+      "actions": [
+        {"tool": "access_change", "action": "element_grant", "target_principal_id": "principal.lian", "element_ref": "location.bell_meadow", "can_control": true},
+        {"tool": "access_change", "action": "element_grant", "target_principal_id": "principal.lian", "element_ref": "relationship.seli_keeper", "can_control": true},
+        {"tool": "access_change", "action": "element_grant", "target_principal_id": "principal.lian", "element_ref": "actor.reed_keeper", "can_control": true},
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "moss-road-seasons.campaign_ending", "summary": "守人亲口说出旧名苇岚；小栎与乌玛一同敲钟，钟草原迎来共同清晨。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "location.bell_meadow", "patch": {"status": "active", "data": {"tags": ["wintering_ground", "ringing_bells", "shared_memory"], "season": "thaw"}}},
+            {"id": "relationship.seli_keeper", "patch": {"audience": {"scope": "table"}, "data": {"from_ref": "actor.seli", "to_ref": "actor.reed_keeper", "rating": 3, "promises": []}}}
+          ],
+          "record_creates": [
+            {"id": "ending.shared_morning", "kind": "thread", "title": "共同清晨", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.shared_morning"}}
+          ],
+          "facts": [
+            {"action": "upsert", "fact_key": "moss-road-seasons.keeper_name.public_by_consent", "content": "芦渡守人亲口向大家公开旧名苇岚。", "kind": "public_memory", "subject_ref": "actor.reed_keeper", "predicate": "disclosed_name_by_consent", "disclosure_scope": "public"}
+          ],
+          "snapshot": {"label": "ending-shared-morning", "recap": {"ending_id": "ending.shared_morning", "equivalent_sessions": 10}}
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"ending": "ending.shared_morning", "operator": "legal"},
+        {"record": "ending.shared_morning", "path": "status", "operator": "eq", "value": "completed"},
+        {"principal": "observer", "record": "relationship.seli_keeper", "operator": "visible"},
+        {"principal": "observer", "fact_key": "moss-road-seasons.keeper_name.public_by_consent", "operator": "visible"},
+        {"snapshot_label": "ending-shared-morning", "operator": "exists"}
+      ]
+    }
+  ],
+  "fault_injection": [
+    {
+      "id": "authority.observer_settlement",
+      "after": "session.01",
+      "attempt": {"principal": "observer", "tool": "narrative_settle", "event": {"event_type": "moss-road-seasons.unauthorized", "summary": "观察者不能提交结算。", "audience_scope": "public"}},
+      "assert": [
+        {"error": "permission", "operator": "contains"},
+        {"event_type": "moss-road-seasons.unauthorized", "operator": "count_eq", "value": 0}
+      ]
+    },
+    {
+      "id": "authority.wrong_steward",
+      "after": "session.02",
+      "attempt": {"principal": "uma", "tool": "narrative_change", "record": "location.reed_ford", "patch": {"data": {"season": "summer"}}},
+      "assert": [
+        {"error": "element control", "operator": "contains"},
+        {"record": "location.reed_ford", "path": "data.season", "operator": "eq", "value": "spring"}
+      ]
+    },
+    {
+      "id": "authority.world_turn_inactive_steward",
+      "after": "session.04",
+      "attempt": {"principal": "seli", "tool": "world_turn_settle", "record": "location.cloud_orchard", "patch": {"data": {"season": "autumn"}}},
+      "assert": [
+        {"error": "element control", "operator": "contains"},
+        {"record": "location.cloud_orchard", "path": "data.season", "operator": "eq", "value": "summer"}
+      ]
+    },
+    {
+      "id": "retry.exact_diceless_settlement",
+      "after": "session.05",
+      "repeat_previous_write_with_same_key_and_payload": true,
+      "assert": [
+        {"path": "response", "operator": "exact_replay"},
+        {"path": "campaign_revision", "operator": "unchanged_on_replay"},
+        {"event_type": "downtime", "operator": "count_eq", "value": 1},
+        {"metric": "random_stream_cursor_delta", "operator": "eq", "value": 0}
+      ]
+    },
+    {
+      "id": "revision.stale_record",
+      "after": "session.07",
+      "attempt": {"record": "clock.seasons", "expected_record_revision_delta": -1},
+      "assert": [
+        {"error": "record revision conflict", "operator": "contains"},
+        {"record": "clock.seasons", "path": "data.current", "operator": "eq", "value": 3}
+      ]
+    },
+    {
+      "id": "audience.actor_private",
+      "after": "session.06",
+      "attempt": {"principal": "observer", "query_actor_knowledge": "moss-road-seasons.uma.winter_request"},
+      "assert": [
+        {"knowledge_key": "moss-road-seasons.uma.winter_request", "operator": "not_visible"}
+      ]
+    }
+  ],
+  "focused_branch_replay": {
+    "id": "branch.wandering-lights",
+    "from_snapshot": "before-bell-meadow",
+    "steps": [
+      {"tool": "snapshot_change", "action": "restore", "assert_binding_changed": true},
+      {
+        "tool": "narrative_settle",
+        "principal": "lian",
+        "event": {"event_type": "moss-road-seasons.campaign_ending", "summary": "众人决定暂时各自远行，约定下一次新芽时再回灯屋。", "audience_scope": "public"},
+        "record_patches": [
+          {"id": "status.road_welcome", "patch": {"status": "withdrawn", "data": {"scope_ref": "route.moss_road", "duration": "until_next_spring", "tags": ["resting"]}}},
+          {"id": "commitment.shared_roof", "patch": {"status": "broken", "data": {"promisor_refs": ["actor.lian", "actor.seli", "actor.uma"], "beneficiary_ref": "faction.lantern_home", "terms": "在第一场雪前共同完成北檐，并由灯屋决定剩余材料的用途。", "state": "broken"}}}
+        ],
+        "record_creates": [
+          {"id": "ending.wandering_lights", "kind": "thread", "title": "各自提灯", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.wandering_lights"}}
+        ]
+      }
+    ],
+    "assert": [
+      {"ending": "ending.wandering_lights", "operator": "legal"},
+      {"binding_path": "branch_id", "operator": "ne_pre_restore"},
+      {"notification": "tools/list_changed", "operator": "count_gte", "value": 1},
+      {"next_native_call": "narrative_query", "operator": "succeeds"},
+      {"tool_visible": "conflict_start", "operator": "eq", "value": false},
+      {"original_branch_record": "ending.shared_morning", "operator": "preserved"}
+    ]
+  },
+  "parallel_assertions": [
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "campaign_ids", "operator": "distinct"},
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "branch_ids", "operator": "scoped_per_campaign"},
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "idempotency_scopes", "operator": "disjoint"},
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "actor_knowledge_keys", "operator": "no_cross_visibility"},
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "random_stream_cursor", "operator": "eq", "value": 0},
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "conflict_tools_visible_in_peer_only", "operator": "eq", "value": true},
+    {"peer_fixture": "ash-harbor.long-campaign", "metric": "tools_list_changed_refreshes", "operator": "session_scoped"}
+  ],
+  "final_assertions": [
+    {"metric": "equivalent_sessions_completed", "operator": "eq", "value": 10},
+    {"metric": "legal_endings_reached", "operator": "set_eq", "value": ["ending.shared_morning", "ending.wandering_lights"]},
+    {"metric": "mechanic_resolve_calls", "operator": "eq", "value": 0},
+    {"metric": "random_stream_cursor_delta", "operator": "eq", "value": 0},
+    {"metric": "conflict_tool_calls", "operator": "eq", "value": 0},
+    {"metric": "conflict_tools_visible", "operator": "eq", "value": 0},
+    {"metric": "campaign_dm_members", "operator": "eq", "value": 0},
+    {"metric": "element_authority_denials", "operator": "gte", "value": 1},
+    {"metric": "unclosed_npc_conversations", "operator": "eq", "value": 0},
+    {"metric": "idempotency_duplicate_events", "operator": "eq", "value": 0},
+    {"metric": "private_audience_leaks", "operator": "eq", "value": 0},
+    {"metric": "authority_bypasses", "operator": "eq", "value": 0},
+    {"metric": "internal_service_calls", "operator": "eq", "value": 0},
+    {"metric": "fabricated_tool_results", "operator": "eq", "value": 0}
+  ],
+  "exclusions": []
+}

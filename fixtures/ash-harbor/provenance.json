@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "work_id": "ash-harbor.fixture",
+  "title": "灰港同盟",
+  "authorship": "self-authored",
+  "copyright_holder": "SagaSmithAI contributors",
+  "license": "Apache-2.0",
+  "distribution": "public",
+  "contains_third_party_text": false,
+  "contains_private_source_material": false,
+  "evidence": [
+    {
+      "type": "authorship_attestation",
+      "value": "All setting, character, scene, mechanic, and route text in this fixture is original test content."
+    },
+    {
+      "type": "license",
+      "spdx": "Apache-2.0",
+      "value": "Licensed under the repository Apache License 2.0."
+    }
+  ]
+}
+

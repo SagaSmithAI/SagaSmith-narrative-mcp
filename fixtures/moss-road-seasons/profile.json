@@ -1,0 +1,73 @@
+{
+  "id": "moss-road-seasons.profile",
+  "version": "1.0.0",
+  "title": "苔路四季无骰共管档案",
+  "mechanics_level": 0,
+  "capabilities": [
+    "downtime",
+    "element_stewardship",
+    "multi_audience",
+    "npc_conversation",
+    "travel",
+    "world_turn"
+  ],
+  "authority": {
+    "administrative_roles": ["owner"],
+    "facilitator_roles": [],
+    "fixed_facilitator_required": false,
+    "player_controls_owned_actor": true,
+    "element_stewardship": true,
+    "stewardship_rotates_by_scene": true,
+    "world_turn_may_be_proposed_by_active_steward": true,
+    "audience_scopes": ["table", "group", "actor"],
+    "conflict_is_available": false,
+    "semantic_settlement": "Players state choices and consequences explicitly; the Agent reviews meaning and MCP validates authority and commits state."
+  },
+  "actor_schema": {
+    "type": "object",
+    "required": ["calling", "keepsake", "open_promises"],
+    "properties": {
+      "calling": {"type": "string"},
+      "keepsake": {"type": "string"},
+      "open_promises": {"type": "array", "items": {"type": "string"}},
+      "conditions": {"type": "array", "items": {"type": "string"}}
+    },
+    "additionalProperties": true
+  },
+  "record_extensions": {
+    "clock": {
+      "required_data": ["current", "maximum", "milestones"],
+      "invariant": "0 <= current <= maximum; movement occurs only through explicit world-turn settlement"
+    },
+    "relationship": {
+      "required_data": ["from_ref", "to_ref", "rating", "promises"],
+      "invariant": "-3 <= rating <= 3; every rating change cites an explicit event"
+    },
+    "commitment": {
+      "required_data": ["promisor_refs", "beneficiary_ref", "terms", "state"],
+      "invariant": "state is open, fulfilled, released, or broken and never changes automatically"
+    },
+    "route": {
+      "required_data": ["stops", "seasonal_access"],
+      "invariant": "travel order is fictionally decided and recorded, not mechanically inferred"
+    },
+    "travel_leg": {
+      "required_data": ["from_ref", "to_ref", "state"],
+      "invariant": "state is planned, underway, completed, or abandoned"
+    },
+    "resource": {
+      "required_data": ["current", "maximum", "unit"],
+      "invariant": "0 <= current <= maximum"
+    }
+  },
+  "mechanics": [],
+  "sources": [
+    {
+      "id": "moss-road-seasons.profile-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/moss-road-seasons/profile.json"
+    }
+  ]
+}

@@ -1,0 +1,508 @@
+{
+  "schema_version": 1,
+  "route_id": "ash-harbor.route.free-compact",
+  "title": "灰港自由盟约主路线",
+  "equivalent_sessions": 10,
+  "runner_contract": {
+    "transport": "real_mcp",
+    "host": "real_native_tool_refresh",
+    "binding": "refresh_before_every_context_sensitive_call",
+    "write_arguments": [
+      "campaign_id",
+      "expected_revision",
+      "expected_branch_id",
+      "idempotency_key"
+    ],
+    "record_patch_semantics": "load the current full record, apply JSON Merge Patch, retain immutable identity fields, and send its current revision as expected_record_revision",
+    "fixture_shorthands": "compile record_patches and record_creates into narrative_settle.record_changes; compile downtime/world-turn patches into their changes argument",
+    "tool_loading": "before each non-bootstrap tool, use exposure search/set against the current native list; never call a hidden schema",
+    "scene_loading": "resolve each session scene id from module.json and pass the complete scene object to scene_change start",
+    "seed_materialization": "create every actor and record from campaign-seed.json through public MCP tools after both Packs are active",
+    "actor_reference_mapping": "treat campaign-seed actor ids as fixture aliases; after actor_change returns each authoritative UUID, recursively replace matching actor references in grants, records, scenes, events, audiences, knowledge, and assertions",
+    "no_internal_calls": true,
+    "no_fabricated_tool_results": true,
+    "random_branching": "execute the branch matching the returned Level 1 outcome id; every branch rejoins before the next step"
+  },
+  "principals": {
+    "facilitator": "principal.facilitator",
+    "mara": "principal.mara",
+    "ivo": "principal.ivo",
+    "observer": "principal.observer"
+  },
+  "setup": [
+    {
+      "id": "setup.create_campaign",
+      "principal": "facilitator",
+      "tool": "campaign_setup",
+      "action": "create",
+      "input": {"name": "灰港同盟", "description": "10-session compressed original regression"},
+      "assert": [
+        {"path": "phase", "operator": "eq", "value": "lobby"},
+        {"path": "system_id", "operator": "eq", "value": "narrative"}
+      ]
+    },
+    {
+      "id": "setup.profile_lifecycle",
+      "principal": "facilitator",
+      "tool": "profile_change",
+      "actions": ["create_draft", "finalize", "activate"],
+      "load": "profile.json",
+      "assert": [
+        {"path": "profile.id", "operator": "eq", "value": "ash-harbor.profile"},
+        {"path": "profile.mechanics_level", "operator": "eq", "value": 1},
+        {"path": "profile.checksum", "operator": "sha256"}
+      ]
+    },
+    {
+      "id": "setup.pack_lifecycle",
+      "principal": "facilitator",
+      "tool": "pack_change",
+      "for_each": ["campaign-seed.json", "module.json"],
+      "actions": ["create_draft", "finalize", "import", "activate"],
+      "assert": [
+        {"path": "status", "operator": "eq", "value": "active"},
+        {"path": "pack.rights.distribution", "operator": "eq", "value": "public"}
+      ]
+    },
+    {
+      "id": "setup.access_and_seed",
+      "principal": "facilitator",
+      "tool": "access_change",
+      "load": "campaign-seed.json#/content/principals",
+      "then": {
+        "actors": "campaign-seed.json#/content/actors",
+        "records": "campaign-seed.json#/content/records",
+        "deferred_actor_knowledge": "campaign-seed.json#/content/actor_knowledge"
+      },
+      "assert": [
+        {"kind": "count", "query": "actor_query", "operator": "eq", "value": 4},
+        {"kind": "count", "query": "narrative_query", "operator": "eq", "value": 16}
+      ]
+    },
+    {
+      "id": "setup.enter_play",
+      "principal": "facilitator",
+      "tool": "game_phase",
+      "input": {"phase": "play"},
+      "then": {
+        "tool": "narrative_settle",
+        "event": {"event_type": "ash-harbor.background_initialized", "summary": "战役开始时各角色仅持有自己的背景知识。", "audience_scope": "dm"},
+        "actor_knowledge_from": "campaign-seed.json#/content/actor_knowledge"
+      },
+      "assert": [
+        {"path": "phase", "operator": "eq", "value": "play"},
+        {"tool_visible": "conflict_start", "operator": "eq", "value": true},
+        {"tool_visible": "profile_change", "operator": "eq", "value": false},
+        {"notification": "tools/list_changed", "operator": "count_gte", "value": 1}
+      ]
+    }
+  ],
+  "sessions": [
+    {
+      "id": "session.01",
+      "scene": "scene.01_floodgate_embers",
+      "title": "潮闸余火",
+      "principal": "facilitator",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {
+            "event_type": "ash-harbor.floodgate_testimony",
+            "summary": "工人们证实夜船仍在低潮运货。",
+            "audience_scope": "public",
+            "participants": [
+              {"actor_id": "actor.mara", "role": "witness"},
+              {"actor_id": "actor.ivo", "role": "witness"}
+            ]
+          },
+          "record_patches": [
+            {"id": "clock.crackdown", "patch": {"data": {"current": 2, "maximum": 6, "completion": "维伊依紧急令封锁全港"}}},
+            {"id": "relationship.mara_union", "patch": {"data": {"from_ref": "actor.mara", "to_ref": "faction.tide_union", "rating": 2, "tags": ["trusted_voice"]}}}
+          ],
+          "facts": [
+            {"action": "upsert", "fact_key": "ash-harbor.night_ferry.active", "content": "一艘无标记驳船每逢低潮穿过七号潮闸。", "kind": "observation", "subject_ref": "location.floodgate", "predicate": "hosts_night_ferry", "disclosure_scope": "public"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.crackdown", "path": "data.current", "operator": "eq", "value": 2},
+        {"record": "relationship.mara_union", "path": "data.rating", "operator": "eq", "value": 2}
+      ]
+    },
+    {
+      "id": "session.02",
+      "scene": "scene.02_glass_auction",
+      "title": "玻璃市场暗拍",
+      "principal": "mara",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "mechanic_resolve",
+          "mechanic_id": "ash-harbor.risky_action",
+          "input": {"dice": 3},
+          "save_result_as": "auction_roll",
+          "assert": [
+            {"path": "random_stream_receipt.cursor_after", "operator": "gt_path", "other": "random_stream_receipt.cursor_before"},
+            {"path": "random_stream_receipt.profile_checksum", "operator": "eq_active_profile_checksum"}
+          ]
+        },
+        {
+          "tool": "narrative_settle",
+          "principal": "facilitator",
+          "event_by": {
+            "auction_roll.result.outcome.id": {
+              "setback": {"summary": "玛拉带回载荷单，但已被玻璃署盯上。"},
+              "mixed": {"summary": "玛拉以一项人情换得载荷单。"},
+              "full": {"summary": "玛拉无声换走了载荷单。"}
+            }
+          },
+          "event_defaults": {"event_type": "ash-harbor.manifest_acquired", "audience_scope": "public"},
+          "record_patches_by": {
+            "auction_roll.result.outcome.id": {
+              "setback": [
+                {"id": "resource.leverage", "patch": {"data": {"current": 2, "maximum": 6, "unit": "evidence"}}},
+                {"id": "clock.crackdown", "patch": {"data": {"current": 3, "maximum": 6, "completion": "维伊依紧急令封锁全港"}}}
+              ],
+              "mixed": [{"id": "resource.leverage", "patch": {"data": {"current": 3, "maximum": 6, "unit": "evidence"}}}],
+              "full": [{"id": "resource.leverage", "patch": {"data": {"current": 3, "maximum": 6, "unit": "evidence"}}}]
+            }
+          }
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "resource.leverage", "path": "data.current", "operator": "gte", "value": 2},
+        {"record": "resource.leverage", "path": "data.current", "operator": "lte", "value": 3}
+      ]
+    },
+    {
+      "id": "session.03",
+      "scene": "scene.03_night_ferry",
+      "title": "夜船穿行",
+      "principal": "ivo",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "conflict_start", "input": {"objective": "recover_sealed_box", "mode": "agent"}},
+        {
+          "tool": "mechanic_resolve",
+          "mechanic_id": "ash-harbor.risky_action",
+          "input": {"dice": 3},
+          "save_result_as": "ferry_roll"
+        },
+        {"tool": "conflict_act", "input_from": "ferry_roll"},
+        {"tool": "conflict_end", "input": {"outcome": "box_recovered", "return_phase": "play"}},
+        {
+          "tool": "narrative_settle",
+          "principal": "facilitator",
+          "event": {"event_type": "ash-harbor.ferry_box_recovered", "summary": "伊沃带回密封记录箱，夜船逃入浓雾。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "clock.vault_breach", "patch": {"data": {"current": 2, "maximum": 6, "completion": "密库记录可作为港口章程证据"}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"path": "phase", "operator": "eq", "value": "play"},
+        {"path": "conflict", "operator": "is_null"},
+        {"notification": "tools/list_changed", "operator": "count_gte", "value": 2},
+        {"tool_visible": "downtime_settle", "operator": "eq", "value": true}
+      ]
+    },
+    {
+      "id": "session.04",
+      "scene": "scene.04_quiet_repairs",
+      "title": "安静的修补",
+      "principal": "mara",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "downtime_settle",
+          "principal": "facilitator",
+          "summary": "两人修好一艘小艇，并拼出密封箱中的灯塔线索。",
+          "record_patches": [
+            {"id": "resource.crew_coin", "patch": {"data": {"current": 3, "maximum": 6, "unit": "favor"}}},
+            {"id": "clock.vault_breach", "patch": {"data": {"current": 3, "maximum": 6, "completion": "密库记录可作为港口章程证据"}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "resource.crew_coin", "path": "data.current", "operator": "eq", "value": 3},
+        {"record": "clock.vault_breach", "path": "data.current", "operator": "eq", "value": 3}
+      ]
+    },
+    {
+      "id": "session.05",
+      "scene": "scene.05_strike_assembly",
+      "title": "罢工议会",
+      "principal": "mara",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "principal": "facilitator",
+          "event": {"event_type": "ash-harbor.union_mandate", "summary": "潮声工会授权玛拉谈判一项三方共治盟约。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "faction.tide_union", "patch": {"data": {"agenda": "以初代章程争取三方共治", "standing": 2, "tags": ["workers", "mutual_aid", "mandate"]}}},
+            {"id": "relationship.mara_union", "patch": {"data": {"from_ref": "actor.mara", "to_ref": "faction.tide_union", "rating": 3, "tags": ["mandated_voice"]}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "faction.tide_union", "path": "data.standing", "operator": "eq", "value": 2},
+        {"record": "relationship.mara_union", "path": "data.rating", "operator": "eq", "value": 3}
+      ]
+    },
+    {
+      "id": "session.06",
+      "scene": "scene.06_world_turn",
+      "title": "风向变化",
+      "principal": "facilitator",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "world_turn_settle",
+          "summary": "风暴沿外堤逼近；玻璃署增派巡逻；商盟开放一条避风航路。",
+          "record_patches": [
+            {"id": "clock.stormfront", "patch": {"data": {"current": 2, "maximum": 4, "completion": "洪水迫使所有阵营立即决断"}}},
+            {"id": "clock.crackdown", "patch_delta": {"data.current": 1}},
+            {"id": "faction.gate_compact", "patch": {"data": {"agenda": "用避风航路换取共治席位", "standing": 1, "tags": ["merchants", "ferries", "negotiable"]}}}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.stormfront", "path": "data.current", "operator": "eq", "value": 2},
+        {"record": "faction.gate_compact", "path": "data.standing", "operator": "eq", "value": 1}
+      ]
+    },
+    {
+      "id": "session.07",
+      "scene": "scene.07_shipwright_parley",
+      "title": "船匠的三次敲击",
+      "principal": "ivo",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {"tool": "npc_conversation", "principal": "facilitator", "action": "open", "npc_actor_id": "actor.serin", "input": {"private_worker_id": "worker.serin"}, "save_result_as": "serin_conversation"},
+        {"tool": "npc_conversation", "principal": "facilitator", "action": "propose", "conversation_from": "serin_conversation", "input": {"content": "塞林记得低潮管道，但他担心路线暴露后工会会利用密库。"}, "save_result_as": "serin_proposal"},
+        {"tool": "npc_conversation", "principal": "facilitator", "action": "publish", "conversation_from": "serin_conversation", "input": {"proposal_id_from": "serin_proposal", "content": "塞林愿意带伊沃走低潮管道。", "audience": {"scope": "actor", "actor_ids": ["actor.ivo"]}}},
+        {"tool": "npc_conversation", "principal": "facilitator", "action": "close", "conversation_from": "serin_conversation"},
+        {
+          "tool": "narrative_settle",
+          "principal": "facilitator",
+          "event": {"event_type": "ash-harbor.deadlight_route_shared", "summary": "塞林只向伊沃说明了通往燃尽灯塔的低潮管道。", "audience_scope": "dm"},
+          "record_patches": [
+            {"id": "relationship.ivo_serin", "patch": {"data": {"from_ref": "actor.ivo", "to_ref": "actor.serin", "rating": 2, "tags": ["debt_acknowledged"]}}}
+          ],
+          "actor_knowledge": [
+            {"action": "add", "actor_id": "actor.ivo", "knowledge_key": "ash-harbor.ivo.deadlight_route", "proposition": "只有低潮前二十分钟能通过北侧排水管进入燃尽灯塔。", "epistemic_status": "known", "confidence": 3, "cause": "told_by", "disclosure_scope": "owner"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"principal": "ivo", "knowledge_key": "ash-harbor.ivo.deadlight_route", "operator": "visible"},
+        {"principal": "mara", "knowledge_key": "ash-harbor.ivo.deadlight_route", "operator": "not_visible"},
+        {"principal": "facilitator", "conversation_path": "proposals", "operator": "not_present_in_director_publication"},
+        {"conversation_status": "closed", "operator": "eq", "value": true}
+      ]
+    },
+    {
+      "id": "session.08",
+      "scene": "scene.08_deadlight_vault",
+      "title": "燃尽灯塔的密库",
+      "principal": "facilitator",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "ash-harbor.charter_recovered", "summary": "三人在沉船密库中找到了初代港章原件。", "audience_scope": "dm"},
+          "record_patches": [
+            {"id": "clock.vault_breach", "patch": {"status": "completed", "data": {"current": 6, "maximum": 6, "completion": "密库记录可作为港口章程证据"}}},
+            {"id": "secret.first_charter", "patch": {"status": "discovered"}},
+            {"id": "resource.leverage", "patch_delta": {"data.current": 2}}
+          ],
+          "facts": [
+            {"action": "upsert", "fact_key": "ash-harbor.charter.authentic", "content": "密库原件的三枚印章与市档案完全一致。", "kind": "evidence", "subject_ref": "secret.first_charter", "predicate": "is_authentic", "disclosure_scope": "dm"}
+          ],
+          "actor_knowledge": [
+            {"action": "add", "actor_id": "actor.mara", "knowledge_key": "ash-harbor.mara.first_charter", "proposition": "初代港章明文要求三方共治。", "epistemic_status": "known", "confidence": 3, "cause": "witnessed", "disclosure_scope": "owner"},
+            {"action": "add", "actor_id": "actor.ivo", "knowledge_key": "ash-harbor.ivo.first_charter", "proposition": "初代港章明文要求三方共治。", "epistemic_status": "known", "confidence": 3, "cause": "witnessed", "disclosure_scope": "owner"}
+          ]
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"record": "clock.vault_breach", "path": "data.current", "operator": "eq", "value": 6},
+        {"principal": "observer", "record": "secret.first_charter", "operator": "not_visible"},
+        {"principal": "mara", "knowledge_key": "ash-harbor.mara.first_charter", "operator": "visible"},
+        {"principal": "ivo", "knowledge_key": "ash-harbor.mara.first_charter", "operator": "not_visible"}
+      ]
+    },
+    {
+      "id": "session.09",
+      "scene": "scene.09_last_downtime",
+      "title": "最后一次低潮",
+      "principal": "mara",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "downtime_settle",
+          "principal": "facilitator",
+          "summary": "玛拉与伊沃准备见证人和议会所需物资。",
+          "record_patches": [
+            {"id": "resource.crew_coin", "patch_delta": {"data.current": 1}},
+            {"id": "resource.leverage", "patch_delta": {"data.current": 1}}
+          ]
+        },
+        {"tool": "snapshot_change", "action": "create", "label": "before-storm-council"},
+        {
+          "tool": "narrative_settle",
+          "principal": "facilitator",
+          "event": {"event_type": "ash-harbor.council_ready", "summary": "见证人、章程和商盟席位都已准备就绪。", "audience_scope": "public"}
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"snapshot_label": "before-storm-council", "operator": "exists"},
+        {"record": "resource.leverage", "path": "data.current", "operator": "gte", "value": 5}
+      ]
+    },
+    {
+      "id": "session.10",
+      "scene": "scene.10_storm_council",
+      "title": "风暴议会",
+      "principal": "facilitator",
+      "actions": [
+        {"tool": "scene_change", "action": "start"},
+        {
+          "tool": "narrative_settle",
+          "event": {"event_type": "ash-harbor.campaign_ending", "summary": "初代港章在公众面前验真，三方签署自由港盟约。", "audience_scope": "public"},
+          "record_patches": [
+            {"id": "secret.first_charter", "patch": {"status": "revealed", "audience": {"scope": "table"}}},
+            {"id": "clock.stormfront", "patch": {"status": "completed", "data": {"current": 4, "maximum": 4, "completion": "洪水迫使所有阵营立即决断"}}}
+          ],
+          "record_creates": [
+            {"id": "ending.free_compact", "kind": "thread", "title": "自由港盟约", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.free_compact"}}
+          ],
+          "facts": [
+            {"action": "upsert", "fact_key": "ash-harbor.charter.public", "content": "灰港公众验证了初代港章和三方共治条款。", "kind": "public_record", "subject_ref": "secret.first_charter", "predicate": "is_public", "disclosure_scope": "public"}
+          ],
+          "snapshot": {"label": "ending-free-compact", "recap": {"ending_id": "ending.free_compact", "equivalent_sessions": 10}}
+        },
+        {"tool": "scene_change", "action": "end"}
+      ],
+      "assert": [
+        {"ending": "ending.free_compact", "operator": "legal"},
+        {"record": "ending.free_compact", "path": "status", "operator": "eq", "value": "completed"},
+        {"principal": "observer", "record": "secret.first_charter", "operator": "visible"},
+        {"snapshot_label": "ending-free-compact", "operator": "exists"}
+      ]
+    }
+  ],
+  "fault_injection": [
+    {
+      "id": "authorization.observer_write",
+      "after": "session.01",
+      "attempt": {
+        "principal": "observer",
+        "tool": "narrative_change",
+        "action": "update",
+        "record": "resource.crew_coin"
+      },
+      "assert": [
+        {"error": "access denied", "operator": "contains"},
+        {"record": "resource.crew_coin", "path": "data.current", "operator": "eq", "value": 2}
+      ]
+    },
+    {
+      "id": "authorization.player_world_turn",
+      "after": "session.05",
+      "attempt": {
+        "principal": "ivo",
+        "tool": "world_turn_settle",
+        "summary": "unauthorized world turn",
+        "record": "clock.stormfront"
+      },
+      "assert": [
+        {"error": "facilitator authority", "operator": "contains"},
+        {"record": "clock.stormfront", "path": "data.current", "operator": "eq", "value": 0}
+      ]
+    },
+    {
+      "id": "audience.actor_record",
+      "after": "session.07",
+      "attempt": {"principal": "mara", "query_record": "relationship.ivo_serin"},
+      "assert": [
+        {"error": "private", "operator": "contains"}
+      ]
+    },
+    {
+      "id": "retry.exact_settlement",
+      "after": "session.05",
+      "repeat_previous_write_with_same_key_and_payload": true,
+      "assert": [
+        {"path": "response", "operator": "exact_replay"},
+        {"path": "campaign_revision", "operator": "unchanged_on_replay"},
+        {"event_type": "ash-harbor.union_mandate", "operator": "count_eq", "value": 1}
+      ]
+    },
+    {
+      "id": "revision.stale_record",
+      "after": "session.06",
+      "attempt": {"record": "clock.stormfront", "expected_record_revision_delta": -1},
+      "assert": [
+        {"error": "record revision conflict", "operator": "contains"},
+        {"record": "clock.stormfront", "path": "data.current", "operator": "eq", "value": 2}
+      ]
+    },
+    {
+      "id": "audience.facilitator_secret",
+      "after": "session.08",
+      "attempt": {"principal": "observer", "query_record": "secret.first_charter"},
+      "assert": [
+        {"error": "private", "operator": "contains"}
+      ]
+    }
+  ],
+  "focused_branch_replay": {
+    "id": "branch.iron-curfew",
+    "from_snapshot": "before-storm-council",
+    "steps": [
+      {"tool": "snapshot_change", "action": "restore", "assert_binding_changed": true},
+      {
+        "tool": "narrative_settle",
+        "principal": "facilitator",
+        "event": {"event_type": "ash-harbor.campaign_ending", "summary": "证据在议会前被洪水损毁，玻璃署启动铁幕戒严。", "audience_scope": "public"},
+        "record_patches": [
+          {"id": "clock.crackdown", "patch": {"status": "completed", "data": {"current": 6, "maximum": 6, "completion": "维伊依紧急令封锁全港"}}},
+          {"id": "resource.leverage", "patch": {"data": {"current": 1, "maximum": 6, "unit": "evidence"}}}
+        ],
+        "record_creates": [
+          {"id": "ending.iron_curfew", "kind": "thread", "title": "铁幕戒严", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "facilitator"}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.iron_curfew"}}
+        ]
+      }
+    ],
+    "assert": [
+      {"ending": "ending.iron_curfew", "operator": "legal"},
+      {"binding_path": "branch_id", "operator": "ne_pre_restore"},
+      {"notification": "tools/list_changed", "operator": "count_gte", "value": 1},
+      {"next_native_call": "narrative_query", "operator": "succeeds"},
+      {"original_branch_record": "ending.free_compact", "operator": "preserved"}
+    ]
+  },
+  "final_assertions": [
+    {"metric": "equivalent_sessions_completed", "operator": "eq", "value": 10},
+    {"metric": "legal_endings_reached", "operator": "set_eq", "value": ["ending.free_compact", "ending.iron_curfew"]},
+    {"metric": "unclosed_npc_conversations", "operator": "eq", "value": 0},
+    {"metric": "active_conflicts", "operator": "eq", "value": 0},
+    {"metric": "idempotency_duplicate_events", "operator": "eq", "value": 0},
+    {"metric": "private_audience_leaks", "operator": "eq", "value": 0},
+    {"metric": "authority_bypasses", "operator": "eq", "value": 0},
+    {"metric": "internal_service_calls", "operator": "eq", "value": 0},
+    {"metric": "fabricated_tool_results", "operator": "eq", "value": 0}
+  ]
+}

@@ -1,0 +1,100 @@
+{
+  "id": "ash-harbor.profile",
+  "version": "1.0.0",
+  "title": "灰港长线行动档案",
+  "mechanics_level": 1,
+  "capabilities": [
+    "conflict",
+    "downtime",
+    "mechanics",
+    "multi_audience",
+    "npc_conversation",
+    "world_turn"
+  ],
+  "authority": {
+    "facilitator_roles": ["owner", "dm"],
+    "player_controls_owned_actor": true,
+    "audience_scopes": ["table", "facilitator", "actor"],
+    "world_turn_requires_facilitator": true,
+    "conflict_is_optional": true
+  },
+  "actor_schema": {
+    "type": "object",
+    "required": ["calling", "edges", "strain"],
+    "properties": {
+      "calling": {"type": "string"},
+      "edges": {
+        "type": "object",
+        "additionalProperties": {"type": "integer", "minimum": 0, "maximum": 3}
+      },
+      "strain": {"type": "integer", "minimum": 0, "maximum": 4},
+      "conditions": {"type": "array", "items": {"type": "string"}}
+    },
+    "additionalProperties": true
+  },
+  "record_extensions": {
+    "clock": {
+      "required_data": ["current", "maximum"],
+      "invariant": "0 <= current <= maximum"
+    },
+    "relationship": {
+      "required_data": ["from_ref", "to_ref", "rating"],
+      "invariant": "-3 <= rating <= 3"
+    },
+    "faction": {
+      "required_data": ["agenda", "standing"],
+      "invariant": "-3 <= standing <= 3"
+    },
+    "resource": {
+      "required_data": ["current", "maximum"],
+      "invariant": "0 <= current <= maximum"
+    }
+  },
+  "mechanics": [
+    {
+      "id": "ash-harbor.risky_action",
+      "kind": "dice_pool",
+      "sides": 6,
+      "max_dice": 5,
+      "selection": "highest",
+      "bands": [
+        {"id": "setback", "maximum": 3},
+        {"id": "mixed", "minimum": 4, "maximum": 5},
+        {"id": "full", "minimum": 6, "maximum": 6}
+      ]
+    },
+    {
+      "id": "ash-harbor.harbor_omen",
+      "kind": "table",
+      "entries": [
+        {"range": [1, 1], "id": "fog", "text": "浓雾掩护了一方，也隐藏了另一方的行动。"},
+        {"range": [2, 2], "id": "bells", "text": "警钟比命令早了一刻响起。"},
+        {"range": [3, 3], "id": "ashfall", "text": "灰烬落入港水，旧证据浮上水面。"},
+        {"range": [4, 4], "id": "low_tide", "text": "低潮露出一条平时不可走的路。"},
+        {"range": [5, 5], "id": "mutiny", "text": "一名无名水手公开质疑上级。"},
+        {"range": [6, 6], "id": "clear_lantern", "text": "一盏不可能亮起的灯指出了可行的第三条路。"}
+      ]
+    },
+    {
+      "id": "ash-harbor.advance_clock",
+      "kind": "track_delta",
+      "minimum": 0,
+      "maximum": 8
+    },
+    {
+      "id": "ash-harbor.change_resource",
+      "kind": "resource_delta",
+      "minimum": 0,
+      "maximum": 10
+    }
+  ],
+  "sources": [
+    {
+      "id": "ash-harbor.profile-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/ash-harbor/profile.json"
+    }
+  ]
+}

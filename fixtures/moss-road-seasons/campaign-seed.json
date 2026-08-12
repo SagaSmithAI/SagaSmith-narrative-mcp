@@ -1,0 +1,373 @@
+{
+  "id": "moss-road-seasons.seed",
+  "version": "1.0.0",
+  "title": "苔路四季战役种子",
+  "kind": "campaign_seed",
+  "profile_requirements": [
+    {"id": "moss-road-seasons.profile", "version": "1.0.0"}
+  ],
+  "dependencies": [],
+  "sources": [
+    {
+      "id": "moss-road-seasons.seed-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/moss-road-seasons/campaign-seed.json"
+    }
+  ],
+  "rights": {
+    "license": "Apache-2.0",
+    "distribution": "public",
+    "contains_private_source_material": false
+  },
+  "review": {
+    "agent_finalization": true,
+    "reviewer": "fixture-author",
+    "evidence_checked": true,
+    "mechanical_validation": "required"
+  },
+  "content": {
+    "campaign": {
+      "name": "苔路四季",
+      "description": "三名行路人陪伴灯屋社区走过四季，并共同决定一条旧路应成为归途、驿路还是留给荒野。",
+      "starting_phase": "lobby",
+      "randomness": "none",
+      "fixed_facilitator": false
+    },
+    "principals": [
+      {
+        "id": "principal.lian",
+        "role": "owner",
+        "narrative_role": "player",
+        "actor_grants": ["actor.lian"],
+        "element_grants": ["location.lantern_home", "faction.lantern_home"]
+      },
+      {
+        "id": "principal.seli",
+        "role": "player",
+        "actor_grants": ["actor.seli", "actor.reed_keeper"],
+        "element_grants": ["location.reed_ford", "actor.reed_keeper"]
+      },
+      {
+        "id": "principal.uma",
+        "role": "player",
+        "actor_grants": ["actor.uma", "actor.ori"],
+        "element_grants": ["location.cloud_orchard", "actor.ori"]
+      },
+      {
+        "id": "principal.observer",
+        "role": "observer",
+        "actor_grants": [],
+        "element_grants": []
+      }
+    ],
+    "actors": [
+      {
+        "id": "actor.lian",
+        "name": "连朔",
+        "type": "player_character",
+        "controller": {"principal_id": "principal.lian"},
+        "sheet": {
+          "calling": "修伞人",
+          "keepsake": "一块会在雨前发凉的青瓦",
+          "open_promises": ["在第一场雪前修好灯屋北檐"],
+          "conditions": []
+        }
+      },
+      {
+        "id": "actor.seli",
+        "name": "瑟黎",
+        "type": "player_character",
+        "controller": {"principal_id": "principal.seli"},
+        "sheet": {
+          "calling": "种声人",
+          "keepsake": "装着三粒旧钟声的木匣",
+          "open_promises": ["把芦渡守人的真名送到钟草原"],
+          "conditions": []
+        }
+      },
+      {
+        "id": "actor.uma",
+        "name": "乌玛",
+        "type": "player_character",
+        "controller": {"principal_id": "principal.uma"},
+        "sheet": {
+          "calling": "云果记账员",
+          "keepsake": "一册只记赠予、不记欠债的账本",
+          "open_promises": ["让云园和灯屋共同决定最后一篮果子的去处"],
+          "conditions": []
+        }
+      },
+      {
+        "id": "actor.reed_keeper",
+        "name": "芦渡守人",
+        "type": "persistent_npc",
+        "controller": {"scope": "steward", "principal_id": "principal.seli"},
+        "sheet": {
+          "calling": "守渡者",
+          "keepsake": "刻有旧名的空舟楔",
+          "open_promises": [],
+          "conditions": ["name_withheld"]
+        }
+      },
+      {
+        "id": "actor.ori",
+        "name": "小栎",
+        "type": "persistent_npc",
+        "controller": {"scope": "steward", "principal_id": "principal.uma"},
+        "sheet": {
+          "calling": "灯屋学徒",
+          "keepsake": "一枚不会落地的云果核",
+          "open_promises": ["冬至时敲响草原小钟"],
+          "conditions": []
+        }
+      }
+    ],
+    "records": [
+      {
+        "id": "location.lantern_home",
+        "kind": "location",
+        "title": "灯屋",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "steward", "principal_id": "principal.lian"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["community", "roadside", "leaking_roof"], "season": "spring"}
+      },
+      {
+        "id": "location.reed_ford",
+        "kind": "location",
+        "title": "芦渡",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "steward", "principal_id": "principal.seli"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["river", "whispering_reeds"], "season": "spring"}
+      },
+      {
+        "id": "location.cloud_orchard",
+        "kind": "location",
+        "title": "云园",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "steward", "principal_id": "principal.uma"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["highland", "floating_fruit"], "season": "summer"}
+      },
+      {
+        "id": "location.bell_meadow",
+        "kind": "location",
+        "title": "钟草原",
+        "status": "dormant",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "rotating", "principal_ids": ["principal.lian", "principal.seli", "principal.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["wintering_ground", "buried_bells"], "season": "winter"}
+      },
+      {
+        "id": "route.moss_road",
+        "kind": "route",
+        "title": "苔路",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "rotating", "principal_ids": ["principal.lian", "principal.seli", "principal.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {
+          "stops": ["location.lantern_home", "location.reed_ford", "location.cloud_orchard", "location.bell_meadow"],
+          "seasonal_access": {"spring": "muddy", "summer": "open", "autumn": "leaf_hidden", "winter": "bell_marked"}
+        }
+      },
+      {
+        "id": "travel_leg.lantern_to_reed",
+        "kind": "travel_leg",
+        "title": "灯屋至芦渡",
+        "status": "planned",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "location.lantern_home", "to_ref": "location.reed_ford", "state": "planned"}
+      },
+      {
+        "id": "travel_leg.reed_to_orchard",
+        "kind": "travel_leg",
+        "title": "芦渡至云园",
+        "status": "planned",
+        "revision": 0,
+        "audience": {"scope": "group", "actor_ids": ["actor.seli", "actor.uma"]},
+        "controller": {"scope": "group", "actor_ids": ["actor.seli", "actor.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "location.reed_ford", "to_ref": "location.cloud_orchard", "state": "planned"}
+      },
+      {
+        "id": "faction.lantern_home",
+        "kind": "faction",
+        "title": "灯屋共同体",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "steward", "principal_id": "principal.lian"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"agenda": "让每位过路者都能在雨夜得到一盏灯", "standing": 1, "tags": ["hospitality", "repair"]}
+      },
+      {
+        "id": "relationship.lian_home",
+        "kind": "relationship",
+        "title": "连朔与灯屋",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"actor_id": "actor.lian"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "actor.lian", "to_ref": "faction.lantern_home", "rating": 1, "promises": ["repair_north_eave"]}
+      },
+      {
+        "id": "relationship.seli_keeper",
+        "kind": "relationship",
+        "title": "瑟黎与芦渡守人",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "actor", "actor_ids": ["actor.seli"]},
+        "controller": {"actor_id": "actor.seli"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "actor.seli", "to_ref": "actor.reed_keeper", "rating": 0, "promises": ["carry_true_name"]}
+      },
+      {
+        "id": "relationship.uma_ori",
+        "kind": "relationship",
+        "title": "乌玛与小栎",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "group", "actor_ids": ["actor.uma", "actor.lian"]},
+        "controller": {"actor_id": "actor.uma"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "actor.uma", "to_ref": "actor.ori", "rating": 1, "promises": ["share_last_basket"]}
+      },
+      {
+        "id": "clock.seasons",
+        "kind": "clock",
+        "title": "四季行程",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 0, "maximum": 4, "milestones": ["spring", "summer", "autumn", "winter"], "automatic": false}
+      },
+      {
+        "id": "resource.community_stores",
+        "kind": "resource",
+        "title": "共同储备",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 3, "maximum": 6, "unit": "shared_basket"}
+      },
+      {
+        "id": "thread.north_eave",
+        "kind": "thread",
+        "title": "北檐修补",
+        "status": "open",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "steward", "principal_id": "principal.lian"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"state": "materials_needed", "required_refs": ["resource.community_stores", "commitment.shared_roof"]}
+      },
+      {
+        "id": "commitment.shared_roof",
+        "kind": "commitment",
+        "title": "一起修好灯屋北檐",
+        "status": "open",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {
+          "promisor_refs": ["actor.lian", "actor.seli", "actor.uma"],
+          "beneficiary_ref": "faction.lantern_home",
+          "terms": "在第一场雪前共同完成北檐，并由灯屋决定剩余材料的用途。",
+          "state": "open"
+        }
+      },
+      {
+        "id": "rumor.silent_bells",
+        "kind": "rumor",
+        "title": "不响的草原钟",
+        "status": "unverified",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"claim": "钟草原只会为被完整记住的名字响铃。", "truth": "undetermined", "points_to": "location.bell_meadow"}
+      },
+      {
+        "id": "secret.keeper_name",
+        "kind": "secret",
+        "title": "芦渡守人的旧名",
+        "status": "hidden",
+        "revision": 0,
+        "audience": {"scope": "actor", "actor_ids": ["actor.seli"]},
+        "controller": {"scope": "steward", "principal_id": "principal.seli"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"proposition": "守人曾名为苇岚，主动放下名字以守护渡口。", "disclosure_requires": "actor.reed_keeper consent"}
+      },
+      {
+        "id": "status.road_welcome",
+        "kind": "status",
+        "title": "苔路欢迎所有行人",
+        "status": "provisional",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "rotating", "principal_ids": ["principal.lian", "principal.seli", "principal.uma"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"scope_ref": "route.moss_road", "duration": "campaign", "tags": ["hospitality"]}
+      }
+    ],
+    "actor_knowledge": [
+      {
+        "actor_id": "actor.seli",
+        "knowledge_key": "moss-road-seasons.seli.keeper_name",
+        "proposition": "芦渡守人的旧名是苇岚，但公开它需要守人同意。",
+        "epistemic_status": "known",
+        "confidence": 3,
+        "cause": "private_background",
+        "disclosure_scope": "owner"
+      },
+      {
+        "actor_id": "actor.uma",
+        "knowledge_key": "moss-road-seasons.uma.ori_fear",
+        "proposition": "小栎害怕自己敲不响钟，想让乌玛在冬至陪在身边。",
+        "epistemic_status": "known",
+        "confidence": 3,
+        "cause": "private_conversation",
+        "disclosure_scope": "owner"
+      }
+    ],
+    "element_stewardship": [
+      {"element_ref": "location.lantern_home", "principal_id": "principal.lian", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "faction.lantern_home", "principal_id": "principal.lian", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "thread.north_eave", "principal_id": "principal.lian", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "commitment.shared_roof", "principal_id": "principal.lian", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "route.moss_road", "principal_id": "principal.lian", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "location.reed_ford", "principal_id": "principal.seli", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "actor.reed_keeper", "principal_id": "principal.seli", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "travel_leg.lantern_to_reed", "principal_id": "principal.seli", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "relationship.seli_keeper", "principal_id": "principal.seli", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "resource.community_stores", "principal_id": "principal.seli", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "location.cloud_orchard", "principal_id": "principal.uma", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "actor.ori", "principal_id": "principal.uma", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "travel_leg.reed_to_orchard", "principal_id": "principal.uma", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "relationship.uma_ori", "principal_id": "principal.uma", "can_control": true, "scope": {"mode": "campaign"}},
+      {"element_ref": "clock.seasons", "principal_id": "principal.uma", "can_control": true, "scope": {"scene_id": "scene.04_cloud_summer"}}
+    ]
+  }
+}

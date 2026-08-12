@@ -1,0 +1,272 @@
+{
+  "id": "ash-harbor.seed",
+  "version": "1.0.0",
+  "title": "灰港同盟战役种子",
+  "kind": "campaign_seed",
+  "profile_requirements": [
+    {"id": "ash-harbor.profile", "version": "1.0.0"}
+  ],
+  "dependencies": [],
+  "sources": [
+    {
+      "id": "ash-harbor.seed-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/ash-harbor/campaign-seed.json"
+    }
+  ],
+  "rights": {
+    "license": "Apache-2.0",
+    "distribution": "public",
+    "contains_private_source_material": false
+  },
+  "review": {
+    "agent_finalization": true,
+    "reviewer": "fixture-author",
+    "evidence_checked": true,
+    "mechanical_validation": "required"
+  },
+  "content": {
+    "campaign": {
+      "name": "灰港同盟",
+      "description": "灰烬工业港的码头工会、玻璃署和潮闸商盟在风暴前争夺治理权。",
+      "random_seed": "ash-harbor-regression-v1",
+      "starting_phase": "lobby"
+    },
+    "principals": [
+      {"id": "principal.facilitator", "role": "owner"},
+      {"id": "principal.mara", "role": "player", "actor_grants": ["actor.mara"]},
+      {"id": "principal.ivo", "role": "player", "actor_grants": ["actor.ivo"]},
+      {"id": "principal.observer", "role": "observer"}
+    ],
+    "actors": [
+      {
+        "id": "actor.mara",
+        "name": "玛拉·奎尔",
+        "type": "player_character",
+        "controller": {"principal_id": "principal.mara"},
+        "sheet": {"calling": "码头谈判人", "edges": {"sway": 3, "survey": 2, "risk": 1}, "strain": 0, "conditions": []}
+      },
+      {
+        "id": "actor.ivo",
+        "name": "伊沃·里德",
+        "type": "player_character",
+        "controller": {"principal_id": "principal.ivo"},
+        "sheet": {"calling": "潮门送信人", "edges": {"sway": 1, "survey": 2, "risk": 3}, "strain": 0, "conditions": []}
+      },
+      {
+        "id": "actor.serin",
+        "name": "塞林·韦尔",
+        "type": "persistent_npc",
+        "controller": {"scope": "facilitator"},
+        "sheet": {"calling": "沉船工匠", "edges": {"sway": 1, "survey": 3, "risk": 2}, "strain": 1, "conditions": ["owes_union"]}
+      },
+      {
+        "id": "actor.vey",
+        "name": "维伊指挥官",
+        "type": "persistent_npc",
+        "controller": {"scope": "facilitator"},
+        "sheet": {"calling": "玻璃署指挥官", "edges": {"sway": 2, "survey": 2, "risk": 2}, "strain": 0, "conditions": ["bound_by_charter"]}
+      }
+    ],
+    "records": [
+      {
+        "id": "location.greyharbor",
+        "kind": "location",
+        "title": "灰港",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["ashfall", "tidal", "industrial"], "parent_ref": null}
+      },
+      {
+        "id": "location.floodgate",
+        "kind": "location",
+        "title": "七号潮闸",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["sluice", "worker_district"], "parent_ref": "location.greyharbor"}
+      },
+      {
+        "id": "location.glassmarket",
+        "kind": "location",
+        "title": "玻璃市场",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["neutral_ground", "auction"], "parent_ref": "location.greyharbor"}
+      },
+      {
+        "id": "location.deadlight",
+        "kind": "location",
+        "title": "燃尽灯塔",
+        "status": "hidden",
+        "revision": 0,
+        "audience": {"scope": "facilitator"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"tags": ["sealed_vault", "low_tide_access"], "parent_ref": "location.greyharbor"}
+      },
+      {
+        "id": "faction.tide_union",
+        "kind": "faction",
+        "title": "潮声工会",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"agenda": "在风暴季前取得码头共治权", "standing": 1, "tags": ["workers", "mutual_aid"]}
+      },
+      {
+        "id": "faction.glass_office",
+        "kind": "faction",
+        "title": "玻璃署",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"agenda": "以紧急安全令接管所有潮闸", "standing": -1, "tags": ["bureaucracy", "watch"]}
+      },
+      {
+        "id": "faction.gate_compact",
+        "kind": "faction",
+        "title": "潮闸商盟",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"agenda": "保住夜船航路与仓储特许", "standing": 0, "tags": ["merchants", "ferries"]}
+      },
+      {
+        "id": "relationship.mara_union",
+        "kind": "relationship",
+        "title": "玛拉与潮声工会",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"actor_id": "actor.mara"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "actor.mara", "to_ref": "faction.tide_union", "rating": 1, "tags": ["trusted_voice"]}
+      },
+      {
+        "id": "relationship.ivo_serin",
+        "kind": "relationship",
+        "title": "伊沃与塞林的旧债",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "actor", "actor_id": "actor.ivo"},
+        "controller": {"actor_id": "actor.ivo"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"from_ref": "actor.ivo", "to_ref": "actor.serin", "rating": 1, "tags": ["unpaid_rescue"]}
+      },
+      {
+        "id": "clock.vault_breach",
+        "kind": "clock",
+        "title": "沉船密库开启",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 0, "maximum": 6, "completion": "密库记录可作为港口章程证据"}
+      },
+      {
+        "id": "clock.crackdown",
+        "kind": "clock",
+        "title": "玻璃署戒严",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 1, "maximum": 6, "completion": "维伊依紧急令封锁全港"}
+      },
+      {
+        "id": "clock.stormfront",
+        "kind": "clock",
+        "title": "风暴抵达",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 0, "maximum": 4, "completion": "洪水迫使所有阵营立即决断"}
+      },
+      {
+        "id": "resource.crew_coin",
+        "kind": "resource",
+        "title": "行动经费",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "group", "actor_ids": ["actor.mara", "actor.ivo"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 2, "maximum": 6, "unit": "favor"}
+      },
+      {
+        "id": "resource.leverage",
+        "kind": "resource",
+        "title": "谈判筹码",
+        "status": "active",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {"scope": "group", "actor_ids": ["actor.mara", "actor.ivo"]},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"current": 1, "maximum": 6, "unit": "evidence"}
+      },
+      {
+        "id": "rumor.night_manifest",
+        "kind": "rumor",
+        "title": "夜船载荷单",
+        "status": "unverified",
+        "revision": 0,
+        "audience": {"scope": "table"},
+        "controller": {},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"claim": "一艘报废驳船仍在低潮时送货", "truth": "partial", "points_to": "location.deadlight"}
+      },
+      {
+        "id": "secret.first_charter",
+        "kind": "secret",
+        "title": "第一港章",
+        "status": "hidden",
+        "revision": 0,
+        "audience": {"scope": "facilitator"},
+        "controller": {"scope": "facilitator"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"},
+        "data": {"proposition": "初代章程规定潮闸须由工人、商船和市政三方共同管理", "evidence_at": "location.deadlight"}
+      }
+    ],
+    "actor_knowledge": [
+      {
+        "actor_id": "actor.mara",
+        "knowledge_key": "ash-harbor.mara.union_password",
+        "proposition": "工会会议的当日口令是‘潮不记名’",
+        "epistemic_status": "known",
+        "confidence": 3,
+        "cause": "background",
+        "disclosure_scope": "owner"
+      },
+      {
+        "actor_id": "actor.ivo",
+        "knowledge_key": "ash-harbor.ivo.serin_signal",
+        "proposition": "塞林用三短一长的敲击表示相信送信人",
+        "epistemic_status": "known",
+        "confidence": 3,
+        "cause": "background",
+        "disclosure_scope": "owner"
+      }
+    ]
+  }
+}

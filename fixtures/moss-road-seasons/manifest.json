@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "fixture_id": "moss-road-seasons.long-campaign",
+  "title": "苔路四季",
+  "fixture_kind": "compressed_long_campaign",
+  "equivalent_sessions": 10,
+  "license": "Apache-2.0",
+  "authorship": "self-authored",
+  "files": {
+    "profile": "profile.json",
+    "campaign_seed": "campaign-seed.json",
+    "module": "module.json",
+    "primary_route": "route.json",
+    "provenance": "provenance.json"
+  },
+  "required_capabilities": [
+    "downtime",
+    "element_stewardship",
+    "multi_audience",
+    "npc_conversation",
+    "travel",
+    "world_turn"
+  ],
+  "forbidden_capabilities": ["conflict", "mechanics"],
+  "coverage": [
+    "profile_lifecycle",
+    "pack_lifecycle",
+    "dynamic_tools",
+    "level0_diceless",
+    "no_fixed_facilitator",
+    "element_stewardship",
+    "steward_rotation",
+    "relationships",
+    "commitments",
+    "season_clock",
+    "travel",
+    "community_resources",
+    "actor_knowledge",
+    "downtime",
+    "world_turn",
+    "no_conflict_tools",
+    "npc_isolation",
+    "audience_isolation",
+    "idempotent_retry",
+    "stale_revision",
+    "snapshot_restore",
+    "branch_replay",
+    "parallel_campaign_isolation",
+    "legal_endings"
+  ],
+  "checksum_policy": "compute canonical SHA-256 through the public profile and Pack validators"
+}

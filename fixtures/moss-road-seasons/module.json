@@ -1,0 +1,234 @@
+{
+  "id": "moss-road-seasons.module",
+  "version": "1.0.0",
+  "title": "苔路四季：灯屋归途",
+  "kind": "module",
+  "profile_requirements": [
+    {
+      "id": "moss-road-seasons.profile",
+      "version": "1.0.0",
+      "capabilities": ["downtime", "element_stewardship", "multi_audience", "npc_conversation", "travel", "world_turn"],
+      "forbidden_capabilities": ["conflict", "mechanics"]
+    }
+  ],
+  "dependencies": [
+    {"id": "moss-road-seasons.seed", "version": "1.0.0"}
+  ],
+  "sources": [
+    {
+      "id": "moss-road-seasons.module-source",
+      "type": "self-authored",
+      "license": "Apache-2.0",
+      "distribution": "public",
+      "citation": "fixtures/moss-road-seasons/module.json"
+    }
+  ],
+  "rights": {
+    "license": "Apache-2.0",
+    "distribution": "public",
+    "contains_private_source_material": false
+  },
+  "review": {
+    "agent_finalization": true,
+    "reviewer": "fixture-author",
+    "evidence_checked": true,
+    "mechanical_validation": "required"
+  },
+  "content": {
+    "session_equivalent_count": 10,
+    "scenes": [
+      {
+        "id": "scene.01_spring_table",
+        "session_equivalent": 1,
+        "title": "新芽桌会",
+        "location_ref": "location.lantern_home",
+        "participants": ["actor.lian", "actor.seli", "actor.uma", "actor.ori"],
+        "active_stewards": [
+          {"principal_id": "principal.lian", "element_refs": ["location.lantern_home", "faction.lantern_home"]},
+          {"principal_id": "principal.uma", "element_refs": ["actor.ori"]}
+        ],
+        "purpose": "建立无固定 GM 的场景权威，公开共同承诺，并验证 observer 只能读取 table 投影。",
+        "entry": {"phase": "play", "season": "spring"},
+        "settlement_targets": ["commitment.shared_roof", "clock.seasons", "travel_leg.lantern_to_reed"],
+        "exit": {"event_type": "moss-road-seasons.spring_promise"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.02_reed_crossing",
+        "session_equivalent": 1,
+        "title": "芦渡过水",
+        "location_ref": "location.reed_ford",
+        "participants": ["actor.lian", "actor.seli", "actor.uma", "actor.reed_keeper"],
+        "active_stewards": [
+          {"principal_id": "principal.seli", "element_refs": ["location.reed_ford", "actor.reed_keeper"]}
+        ],
+        "purpose": "验证无骰旅行结算、group 受众与 element steward 对地点/NPC 的临时叙事权。",
+        "entry": {"requires_event": "moss-road-seasons.spring_promise", "travel_leg": "travel_leg.lantern_to_reed"},
+        "settlement_targets": ["travel_leg.lantern_to_reed", "relationship.seli_keeper", "resource.community_stores"],
+        "exit": {"event_type": "moss-road-seasons.reed_crossed"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.03_keeper_name",
+        "session_equivalent": 1,
+        "title": "守人的旧名",
+        "location_ref": "location.reed_ford",
+        "participants": ["actor.seli", "actor.reed_keeper"],
+        "active_stewards": [
+          {"principal_id": "principal.seli", "element_refs": ["actor.reed_keeper"]}
+        ],
+        "purpose": "验证持久 NPC 隔离对话、actor 私有知识和经 NPC 同意后的有限 group disclosure。",
+        "entry": {"requires_event": "moss-road-seasons.reed_crossed", "npc_conversation": true},
+        "settlement_targets": ["secret.keeper_name", "relationship.seli_keeper"],
+        "exit": {"event_type": "moss-road-seasons.name_entrusted", "audience": {"scope": "actor", "actor_ids": ["actor.seli"]}},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.04_cloud_summer",
+        "session_equivalent": 1,
+        "title": "云园盛夏",
+        "location_ref": "location.cloud_orchard",
+        "participants": ["actor.lian", "actor.seli", "actor.uma", "actor.ori"],
+        "active_stewards": [
+          {"principal_id": "principal.uma", "element_refs": ["location.cloud_orchard", "actor.ori"]}
+        ],
+        "purpose": "验证由活跃 steward 提议的 world-turn、季节推进和旅行段变更，不运行隐藏模拟。",
+        "entry": {"activity": "world_turn", "requires_event": "moss-road-seasons.name_entrusted"},
+        "settlement_targets": ["clock.seasons", "travel_leg.reed_to_orchard", "relationship.uma_ori"],
+        "exit": {"event_type": "moss-road-seasons.summer_arrived"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.05_warm_rain_repairs",
+        "session_equivalent": 1,
+        "title": "暖雨修补",
+        "location_ref": "location.lantern_home",
+        "participants": ["actor.lian", "actor.seli", "actor.uma"],
+        "active_stewards": [
+          {"principal_id": "principal.lian", "element_refs": ["location.lantern_home", "thread.north_eave"]}
+        ],
+        "purpose": "验证 downtime、共同资源与承诺推进，但不因时间经过自动完成工程。",
+        "entry": {"activity": "downtime", "requires_event": "moss-road-seasons.summer_arrived"},
+        "settlement_targets": ["resource.community_stores", "thread.north_eave", "commitment.shared_roof"],
+        "exit": {"event_type": "moss-road-seasons.eave_framed"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.06_autumn_letter",
+        "session_equivalent": 1,
+        "title": "只给乌玛的秋信",
+        "location_ref": "location.cloud_orchard",
+        "participants": ["actor.uma", "actor.ori"],
+        "active_stewards": [
+          {"principal_id": "principal.uma", "element_refs": ["actor.ori", "location.cloud_orchard"]}
+        ],
+        "purpose": "验证 actor.uma 私有知识不会泄漏给 actor.lian、actor.seli、observer 或 table 摘要。",
+        "entry": {"requires_event": "moss-road-seasons.eave_framed", "audience": {"scope": "actor", "actor_ids": ["actor.uma"]}},
+        "settlement_targets": ["relationship.uma_ori"],
+        "exit": {"event_type": "moss-road-seasons.ori_fear_shared", "audience": {"scope": "actor", "actor_ids": ["actor.uma"]}},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.07_first_frost",
+        "session_equivalent": 1,
+        "title": "初霜同行",
+        "location_ref": "route.moss_road",
+        "participants": ["actor.lian", "actor.seli", "actor.uma", "actor.ori"],
+        "active_stewards": [
+          {"principal_id": "principal.seli", "element_refs": ["route.moss_road"]},
+          {"principal_id": "principal.uma", "element_refs": ["actor.ori"]}
+        ],
+        "purpose": "验证多个 steward 在同场景各自控制不同 element，并把私有担忧转为明确 group knowledge 而非 table 事实。",
+        "entry": {"requires_event": "moss-road-seasons.ori_fear_shared", "season": "autumn"},
+        "settlement_targets": ["clock.seasons", "route.moss_road", "relationship.uma_ori"],
+        "exit": {"event_type": "moss-road-seasons.frost_company", "audience": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]}},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.08_winter_lanterns",
+        "session_equivalent": 1,
+        "title": "冬灯归屋",
+        "location_ref": "location.lantern_home",
+        "participants": ["actor.lian", "actor.seli", "actor.uma", "actor.ori"],
+        "active_stewards": [
+          {"principal_id": "principal.lian", "element_refs": ["location.lantern_home", "faction.lantern_home"]}
+        ],
+        "purpose": "验证冬季 world-turn、关系与共同承诺原子完成，以及公开事件不泄露仍私有的名字。",
+        "entry": {"activity": "world_turn", "requires_event": "moss-road-seasons.frost_company"},
+        "settlement_targets": ["clock.seasons", "thread.north_eave", "commitment.shared_roof", "relationship.lian_home"],
+        "exit": {"event_type": "moss-road-seasons.roof_completed"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.09_thaw_choice",
+        "session_equivalent": 1,
+        "title": "解冻时的岔路",
+        "location_ref": "route.moss_road",
+        "participants": ["actor.lian", "actor.seli", "actor.uma"],
+        "active_stewards": [
+          {"principal_id": "principal.lian", "element_refs": ["route.moss_road"]},
+          {"principal_id": "principal.seli", "element_refs": ["secret.keeper_name"]},
+          {"principal_id": "principal.uma", "element_refs": ["relationship.uma_ori"]}
+        ],
+        "purpose": "验证结局前 snapshot、branch replay、显式 canon 选择与恢复后的 exposure/context refresh。",
+        "entry": {"requires_event": "moss-road-seasons.roof_completed"},
+        "settlement_targets": ["status.road_welcome", "secret.keeper_name", "rumor.silent_bells"],
+        "exit": {"event_type": "moss-road-seasons.thaw_choice", "snapshot_label": "before-bell-meadow"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      },
+      {
+        "id": "scene.10_bell_meadow",
+        "session_equivalent": 1,
+        "title": "钟草原的共同清晨",
+        "location_ref": "location.bell_meadow",
+        "participants": ["actor.lian", "actor.seli", "actor.uma", "actor.reed_keeper", "actor.ori"],
+        "active_stewards": [
+          {"principal_id": "principal.lian", "element_refs": ["location.bell_meadow"]},
+          {"principal_id": "principal.seli", "element_refs": ["actor.reed_keeper"]},
+          {"principal_id": "principal.uma", "element_refs": ["actor.ori"]}
+        ],
+        "purpose": "验证有 consent 的知识公开、合法无骰结局、受众投影和 campaign ending。",
+        "entry": {"requires_event": "moss-road-seasons.thaw_choice", "season": "thaw"},
+        "settlement_targets": ["location.bell_meadow", "relationship.seli_keeper", "status.road_welcome"],
+        "exit": {"event_type": "moss-road-seasons.campaign_ending"},
+        "source": {"type": "self-authored", "license": "Apache-2.0"}
+      }
+    ],
+    "endings": [
+      {
+        "id": "ending.shared_morning",
+        "title": "共同清晨",
+        "legal_when": {
+          "all": [
+            {"record": "thread.north_eave", "path": "data.state", "operator": "eq", "value": "completed"},
+            {"record": "commitment.shared_roof", "path": "data.state", "operator": "eq", "value": "fulfilled"},
+            {"record": "relationship.lian_home", "path": "data.rating", "operator": "gte", "value": 2},
+            {"record": "clock.seasons", "path": "data.current", "operator": "eq", "value": 4},
+            {"fact": "moss-road-seasons.keeper_name.public_by_consent", "disclosure_scope": "public"}
+          ]
+        },
+        "result": "灯屋北檐在雪中完工；守人亲口把旧名交给大家，钟草原第一次为共同记住的名字响起。"
+      },
+      {
+        "id": "ending.wandering_lights",
+        "title": "各自提灯",
+        "legal_when": {
+          "any": [
+            {"record": "commitment.shared_roof", "path": "data.state", "operator": "eq", "value": "broken"},
+            {"record": "resource.community_stores", "path": "data.current", "operator": "eq", "value": 0},
+            {"record": "status.road_welcome", "path": "status", "operator": "eq", "value": "withdrawn"}
+          ]
+        },
+        "result": "众人没有失去彼此，却决定暂时各自提灯远行；苔路保留着下一次相聚的可能。"
+      }
+    ],
+    "machine_assertions": [
+      {"id": "profile.level0", "path": "profile.mechanics_level", "operator": "eq", "value": 0},
+      {"id": "profile.no_mechanics", "path": "profile.mechanics", "operator": "length_eq", "value": 0},
+      {"id": "profile.no_conflict", "path": "profile.capabilities", "operator": "not_contains", "value": "conflict"},
+      {"id": "authority.no_fixed_facilitator", "path": "profile.authority.fixed_facilitator_required", "operator": "eq", "value": false},
+      {"id": "route.ten_sessions", "path": "module.content.session_equivalent_count", "operator": "eq", "value": 10},
+      {"id": "rights.public_original", "path": "provenance.contains_third_party_text", "operator": "eq", "value": false}
+    ]
+  }
+}

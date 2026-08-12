@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "fixture_id": "ash-harbor.long-campaign",
+  "title": "灰港同盟",
+  "fixture_kind": "compressed_long_campaign",
+  "equivalent_sessions": 10,
+  "license": "Apache-2.0",
+  "authorship": "self-authored",
+  "files": {
+    "profile": "profile.json",
+    "campaign_seed": "campaign-seed.json",
+    "module": "module.json",
+    "primary_route": "route.json",
+    "provenance": "provenance.json"
+  },
+  "required_capabilities": [
+    "conflict",
+    "downtime",
+    "mechanics",
+    "multi_audience",
+    "npc_conversation",
+    "world_turn"
+  ],
+  "coverage": [
+    "profile_lifecycle",
+    "pack_lifecycle",
+    "dynamic_tools",
+    "level1_random_receipt",
+    "factions",
+    "relationships",
+    "clocks",
+    "resources",
+    "rumors",
+    "actor_knowledge",
+    "downtime",
+    "world_turn",
+    "optional_conflict",
+    "npc_isolation",
+    "audience_isolation",
+    "idempotent_retry",
+    "stale_revision",
+    "snapshot_restore",
+    "branch_replay",
+    "legal_endings"
+  ],
+  "checksum_policy": "compute canonical SHA-256 through the public profile and Pack validators"
+}
