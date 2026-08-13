@@ -33,11 +33,14 @@ The current Pack kinds are:
   stable logical references for one campaign.
 
 All follow `create_draft -> update_draft -> finalize -> import -> activate`.
-Finalization requires source evidence, an explicit Agent finalization decision,
-and a distribution-rights decision. Finalized `id@version` values cannot be
+Finalization requires typed source evidence with a reproducible locator, an
+explicit Agent finalization decision, and a distribution-rights decision plus
+license/rights basis. Finalized `id@version` values cannot be
 silently reopened or replaced. Activation validates the active profile id,
 version, optional checksum, required and forbidden capabilities, and active Pack
-dependencies. Seed application is idempotent and atomic; reference collisions
+dependencies. Seed application is idempotent and atomic; logical principals,
+memberships, actors, actor grants, element grants, records, and initial
+ActorKnowledge materialize together, while duplicate or dangling references
 are rejected rather than guessed.
 
 Private copyrighted material may be used only according to its recorded rights

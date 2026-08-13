@@ -32,7 +32,7 @@ def finalize_profile(rt: NarrativeRuntime, campaign_id: str, *, conflict: bool =
         "version": "1.0.0",
         "title": "Test",
         "mechanics_level": 1,
-        "capabilities": ["conflict"] if conflict else [],
+        "capabilities": ["mechanics", "conflict"] if conflict else ["mechanics"],
         "mechanics": [
             {
                 "id": "risk",

@@ -13,6 +13,11 @@ version and checksum. Profiles may use Level 0 (explicit Agent/human rulings) or
 the limited pure Level 1 mechanics in this package. More complex rules require a
 separate system provider.
 
+Lobby administrators can inspect campaign-scoped profile/Pack drafts through
+`narrative_query`. Access changes support grant and revoke operations with
+last-owner protection; controlled actors can be updated through `actor_change`.
+Recovery queries and snapshot/branch mutations are administrator-only.
+
 See [Architecture and authority](docs/architecture.md) and
 [Profile and Pack lifecycle](docs/profile-and-pack.md) for the durable product
 boundary. Three self-authored regression campaigns live in `fixtures/ash-harbor`,

@@ -17,7 +17,7 @@
     "fixture_shorthands": "compile record_patches and record_creates into narrative_settle.record_changes; compile downtime/world-turn patches into their changes argument",
     "tool_loading": "before each non-bootstrap tool, use exposure search/set against the current native list; never call a hidden schema",
     "scene_loading": "resolve each session scene id from module.json and pass the complete scene object to scene_change start",
-    "seed_materialization": "create every actor and record from campaign-seed.json through public MCP tools after both Packs are active",
+    "seed_materialization": "apply the active finalized campaign-seed Pack once through pack_change; it atomically materializes memberships, actors, actor/element grants, records, and initial ActorKnowledge",
     "actor_reference_mapping": "treat campaign-seed actor ids as fixture aliases; after actor_change returns each authoritative UUID, recursively replace matching actor references in grants, records, scenes, events, audiences, knowledge, and assertions",
     "no_internal_calls": true,
     "no_fabricated_tool_results": true,
@@ -358,7 +358,7 @@
             {"id": "resource.leverage", "patch_delta": {"data.current": 1}}
           ]
         },
-        {"tool": "snapshot_change", "action": "create", "label": "before-storm-council"},
+        {"tool": "snapshot_change", "principal": "facilitator", "action": "create", "label": "before-storm-council"},
         {
           "tool": "narrative_settle",
           "principal": "facilitator",

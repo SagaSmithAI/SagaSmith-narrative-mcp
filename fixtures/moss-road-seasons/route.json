@@ -14,8 +14,8 @@
       "idempotency_key"
     ],
     "record_patch_semantics": "load the current full record, apply JSON Merge Patch, retain immutable identity fields, and send its current revision as expected_record_revision",
-    "seed_materialization": "create every actor and record from campaign-seed.json through public MCP tools after both Packs are active",
-    "element_grant_semantics": "materialize campaign-seed element_stewardship through access_change, rotate grants explicitly, and require call-time controller authorization",
+    "seed_materialization": "apply the active finalized campaign-seed Pack once through pack_change; it atomically materializes memberships, actors, actor/element grants, records, and initial ActorKnowledge",
+    "element_grant_semantics": "materialize initial element_stewardship in apply_seed, rotate later grants explicitly through access_change, and require call-time controller authorization",
     "no_internal_calls": true,
     "no_fabricated_tool_results": true,
     "random_draws_expected": 0,
@@ -369,7 +369,7 @@
       ],
       "assert": [
         {"snapshot_label": "before-bell-meadow", "operator": "exists"},
-        {"record": "secret.keeper_name", "path": "status", "operator": "eq", "value": "consent_to_disclose"},
+      {"record": "secret.keeper_name", "principal": "seli", "path": "status", "operator": "eq", "value": "consent_to_disclose"},
         {"tool_visible": "conflict_start", "operator": "eq", "value": false}
       ]
     },
@@ -389,7 +389,7 @@
           "event": {"event_type": "moss-road-seasons.campaign_ending", "summary": "守人亲口说出旧名苇岚；小栎与乌玛一同敲钟，钟草原迎来共同清晨。", "audience_scope": "public"},
           "record_patches": [
             {"id": "location.bell_meadow", "patch": {"status": "active", "data": {"tags": ["wintering_ground", "ringing_bells", "shared_memory"], "season": "thaw"}}},
-            {"id": "relationship.seli_keeper", "patch": {"audience": {"scope": "table"}, "data": {"from_ref": "actor.seli", "to_ref": "actor.reed_keeper", "rating": 3, "promises": []}}}
+            {"id": "relationship.seli_keeper", "patch": {"audience": {"scope": "table", "actor_ids": null}, "data": {"from_ref": "actor.seli", "to_ref": "actor.reed_keeper", "rating": 3, "promises": []}}}
           ],
           "record_creates": [
             {"id": "ending.shared_morning", "kind": "thread", "title": "共同清晨", "status": "completed", "revision": 0, "audience": {"scope": "table"}, "controller": {"scope": "group", "actor_ids": ["actor.lian", "actor.seli", "actor.uma"]}, "source": {"type": "self-authored", "license": "Apache-2.0"}, "data": {"legal": true, "ending_id": "ending.shared_morning"}}

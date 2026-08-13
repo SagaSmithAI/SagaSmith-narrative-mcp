@@ -62,6 +62,7 @@ def write_profile(
             "version": version,
             "title": "Authority profile",
             "mechanics_level": 0,
+            "capabilities": ["npc_conversation"],
             "sources": [
                 {
                     "type": "self-authored",
@@ -365,7 +366,26 @@ def test_npc_conversation_rejects_stale_context(tmp_path: Path) -> None:
         assert "conversation" in str(error).lower() or "close" in str(error).lower()
         mutation_was_blocked = True
 
-    if not mutation_was_blocked:
+    if mutation_was_blocked:
+        current = runtime.campaigns.get(campaign_id)
+        runtime.campaigns.update(
+            campaign_id,
+            state=current.state,
+            expected_revision=current.revision,
+        )
+        revision, branch_id = state(runtime, campaign_id)
+        aborted = runtime.npc_conversation(
+            campaign_id,
+            action="abort",
+            conversation_id=conversation_id,
+            data={"private_worker_id": "worker.trusted"},
+            principal_id="owner",
+            expected_revision=revision,
+            expected_branch_id=branch_id,
+            idempotency_key="abort-stale-conversation",
+        )
+        assert aborted["status"] == "aborted"
+    else:
         revision, branch_id = state(runtime, campaign_id)
         with pytest.raises(ValueError, match="stale|close|abort"):
             runtime.npc_conversation(

@@ -29,9 +29,10 @@ from sagasmith_core.branches import resolve_branch
 from sagasmith_core.database import Database
 from sagasmith_core.idempotency import request_hash
 from sagasmith_core.models import ActorGrant, Campaign, CampaignMembership, Character, Principal
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 
 from .contracts import (
+    CAMPAIGN_ROLES,
     PHASE_CONFLICT,
     PHASE_LOBBY,
     PHASE_PLAY,
@@ -42,8 +43,10 @@ from .contracts import (
     required_id,
     required_text,
     state_with_narrative,
+    validate_audience,
     validate_profile,
     validate_record,
+    validate_sources,
 )
 
 ADMIN_ROLES = {"owner", "dm"}
@@ -121,6 +124,16 @@ class NarrativeRuntime:
         profile = active_profile(narrative_document(self.campaigns.get(campaign_id).state))
         return set(profile.get("capabilities", [])) if profile else set()
 
+    def require_no_open_npc_conversation(self, campaign_id: str) -> None:
+        document = narrative_document(self.campaigns.get(campaign_id).state)
+        if any(
+            item.get("status") == "open"
+            for item in document.get("npc_conversations", {}).values()
+        ):
+            raise ValueError(
+                "close or abort every NPC conversation before authoritative recovery"
+            )
+
     @staticmethod
     def _validate_actor_profile(
         profile: Mapping[str, Any] | None, actor: Mapping[str, Any]
@@ -152,6 +165,74 @@ class NarrativeRuntime:
             raise ValueError(
                 f"record {record.get('id')} is missing profile data: " + ", ".join(missing)
             )
+        allowed_audiences = set(
+            dict(profile.get("authority") or {}).get("audience_scopes") or []
+        ) if profile else set()
+        scope = str(dict(record.get("audience") or {}).get("scope") or "table")
+        if allowed_audiences and scope not in allowed_audiences:
+            raise ValueError(f"record audience {scope!r} is not allowed by the active profile")
+
+    def _actor_authorized(
+        self,
+        document: Mapping[str, Any],
+        *,
+        campaign_id: str,
+        actor_id: str,
+        principal_id: str,
+        role: str,
+        control: bool = False,
+        private: bool = False,
+    ) -> bool:
+        """Apply profile narrative authority without core admin-role escalation."""
+
+        core_actor_id = str(dict(document.get("actor_bindings") or {}).get(actor_id) or actor_id)
+        if self._has_facilitator_authority(document, role):
+            try:
+                self.access.require_actor(campaign_id, core_actor_id, principal_id)
+                return True
+            except (LookupError, PermissionError):
+                return False
+        with self.database.transaction() as session:
+            actor = session.get(Character, core_actor_id)
+            if actor is None or actor.campaign_id != campaign_id:
+                return False
+            grant = session.get(
+                ActorGrant,
+                {
+                    "campaign_id": campaign_id,
+                    "principal_id": principal_id,
+                    "actor_id": core_actor_id,
+                },
+            )
+            return bool(
+                grant
+                and (not control or grant.can_control)
+                and (not private or grant.can_view_private)
+            )
+
+    def require_actor_authority(
+        self,
+        campaign_id: str,
+        actor_id: str,
+        principal_id: str,
+        *,
+        control: bool = False,
+        private: bool = False,
+    ) -> str:
+        membership = self.access.require_campaign(campaign_id, principal_id)
+        document = narrative_document(self.campaigns.get(campaign_id).state)
+        core_actor_id = str(dict(document.get("actor_bindings") or {}).get(actor_id) or actor_id)
+        if not self._actor_authorized(
+            document,
+            campaign_id=campaign_id,
+            actor_id=core_actor_id,
+            principal_id=principal_id,
+            role=membership.role,
+            control=control,
+            private=private,
+        ):
+            raise PermissionError(f"principal does not control actor: {actor_id}")
+        return core_actor_id
 
     def branch_id(self, campaign_id: str) -> str:
         return self.branches.current(campaign_id).id
@@ -172,6 +253,96 @@ class NarrativeRuntime:
             "principal_id": principal_id,
             "role": membership.role,
         }
+
+    def snapshot_create(
+        self,
+        campaign_id: str,
+        *,
+        label: str,
+        principal_id: str,
+        expected_revision: int,
+        expected_branch_id: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Create a checkpoint under the same campaign CAS used by narrative writes."""
+
+        self.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
+        key = required_text(idempotency_key, "idempotency_key", limit=200)
+        scope = f"narrative:snapshot:create:{campaign_id}:{expected_branch_id}:{principal_id}"
+        request = {
+            "label": label,
+            "expected_revision": int(expected_revision),
+            "expected_branch_id": expected_branch_id,
+        }
+        with self.database.transaction() as session:
+            replay = self.idempotency.lookup_in_session(session, scope, key, request)
+            if replay is not None and replay.response is not None:
+                return deepcopy(replay.response)
+            campaign = session.get(Campaign, campaign_id)
+            if campaign is None:
+                raise LookupError(campaign_id)
+            branch = resolve_branch(session, campaign)
+            if branch.id != expected_branch_id or campaign.revision != int(expected_revision):
+                raise ValueError("campaign revision or branch conflict")
+            document = narrative_document(campaign.state)
+            if any(
+                item.get("status") == "open"
+                for item in document.get("npc_conversations", {}).values()
+            ):
+                raise ValueError("close or abort every NPC conversation before snapshot")
+            before_state = deepcopy(campaign.state)
+            changed = session.execute(
+                update(Campaign)
+                .where(
+                    Campaign.id == campaign_id,
+                    Campaign.revision == int(expected_revision),
+                    Campaign.active_branch_id == expected_branch_id,
+                )
+                .values(revision=Campaign.revision + 1)
+                .returning(Campaign.revision)
+            ).scalar_one_or_none()
+            if changed is None:
+                raise ValueError("campaign revision conflict during snapshot creation")
+            session.expire(campaign)
+            session.refresh(campaign)
+            snapshot = self.snapshots._create_in_session(
+                session, campaign, label=str(label or "Narrative checkpoint")
+            )
+            response = {
+                "campaign_id": campaign_id,
+                "campaign_revision": int(changed),
+                "branch_id": branch.id,
+                "phase": document["phase"],
+                "snapshot": asdict(snapshot),
+            }
+            revisions = self.revisions.record_group_in_session(
+                session,
+                campaign_id,
+                operation="narrative.snapshot.create",
+                actor=principal_id,
+                branch_id=branch.id,
+                idempotency_key=key,
+                request_hash=request_hash(request),
+                reversible=False,
+                changes=[
+                    {
+                        "entity_type": "campaign",
+                        "entity_id": campaign_id,
+                        "before": {"state": before_state, "revision": int(expected_revision)},
+                        "after": {"state": before_state, "revision": int(changed)},
+                    }
+                ],
+            )
+            self.idempotency.remember_in_session(
+                session,
+                scope,
+                key,
+                request,
+                response,
+                campaign_id=campaign_id,
+                mutation_group_id=revisions[0].mutation_group_id,
+            )
+            return response
 
     def _require_branch_revision(
         self,
@@ -310,6 +481,8 @@ class NarrativeRuntime:
             current = str(document["phase"])
             if current == PHASE_CONFLICT:
                 raise ValueError("end the active conflict before changing game phase")
+            if phase == PHASE_LOBBY and document.get("active_scene_id"):
+                raise ValueError("end the active scene before returning to lobby")
             if phase == PHASE_PLAY and active_profile(document) is None:
                 raise ValueError("activate a finalized profile before entering play")
             document["phase"] = phase
@@ -441,6 +614,17 @@ class NarrativeRuntime:
                     item.get("checksum"), f"dependencies[{index}].checksum", limit=128
                 )
             dependencies.append(dependency)
+        sources = validate_sources(
+            value.get("sources") or [], field="pack.sources", finalized=finalized
+        )
+        raw_rights = value.get("rights") or {}
+        if not isinstance(raw_rights, Mapping):
+            raise ValueError("pack.rights must be an object")
+        rights = deepcopy(dict(raw_rights))
+        raw_review = value.get("review") or {}
+        if not isinstance(raw_review, Mapping):
+            raise ValueError("pack.review must be an object")
+        review = deepcopy(dict(raw_review))
         normalized = {
             "id": required_id(value.get("id"), "pack.id"),
             "version": required_text(value.get("version"), "pack.version", limit=64),
@@ -448,18 +632,19 @@ class NarrativeRuntime:
             "kind": kind,
             "profile_requirements": requirements,
             "dependencies": dependencies,
-            "sources": deepcopy(list(value.get("sources") or [])),
-            "rights": deepcopy(dict(value.get("rights") or {})),
+            "sources": sources,
+            "rights": rights,
             "content": deepcopy(dict(value.get("content") or {})),
-            "review": deepcopy(dict(value.get("review") or {})),
+            "review": review,
         }
         if finalized:
-            if not normalized["sources"]:
-                raise ValueError("Pack finalization requires source evidence")
             if normalized["review"].get("agent_finalization") is not True:
                 raise ValueError("Pack finalization requires explicit Agent review")
-            if "distribution" not in normalized["rights"]:
+            distribution = str(normalized["rights"].get("distribution") or "")
+            if distribution not in {"internal", "private", "public", "restricted"}:
                 raise ValueError("Pack finalization requires a distribution rights decision")
+            if not str(normalized["rights"].get("license") or "").strip():
+                raise ValueError("Pack finalization requires a license or rights basis")
         normalized["checksum"] = checksum(normalized)
         return normalized
 
@@ -589,6 +774,7 @@ class NarrativeRuntime:
         """Materialize one active campaign_seed with stable actor references atomically."""
 
         self.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
+        key = required_text(idempotency_key, "idempotency_key", limit=200)
         request = {
             "pack_key": pack_key,
             "expected_revision": expected_revision,
@@ -596,7 +782,7 @@ class NarrativeRuntime:
         }
         scope = f"narrative:seed.apply:{campaign_id}:{expected_branch_id}:{principal_id}"
         with self.database.transaction() as session:
-            replay = self.idempotency.lookup_in_session(session, scope, idempotency_key, request)
+            replay = self.idempotency.lookup_in_session(session, scope, key, request)
             if replay is not None and replay.response is not None:
                 return deepcopy(replay.response)
             campaign = session.get(Campaign, campaign_id)
@@ -613,8 +799,36 @@ class NarrativeRuntime:
                 raise ValueError("Pack is not a campaign_seed")
             content = deepcopy(dict(pack.get("content") or {}))
             profile = active_profile(document)
+            raw_principals = content.get("principals") or []
+            raw_actors = content.get("actors") or []
+            raw_records = content.get("records") or []
+            raw_knowledge = content.get("actor_knowledge") or []
+            for field, values, maximum in (
+                ("principals", raw_principals, 128),
+                ("actors", raw_actors, 512),
+                ("records", raw_records, 5000),
+                ("actor_knowledge", raw_knowledge, 5000),
+            ):
+                if not isinstance(values, list) or len(values) > maximum:
+                    raise ValueError(f"campaign_seed {field} must be a bounded array")
+                if any(not isinstance(item, Mapping) for item in values):
+                    raise ValueError(f"campaign_seed {field} entries must be objects")
+            principal_ids = [required_id(item.get("id"), "principal.id") for item in raw_principals]
+            actor_refs = [required_id(item.get("id"), "actor.id") for item in raw_actors]
+            record_ids = [required_id(item.get("id"), "record.id") for item in raw_records]
+            for field, values in (
+                ("principal", principal_ids),
+                ("actor", actor_refs),
+                ("record", record_ids),
+            ):
+                if len(values) != len(set(values)):
+                    raise ValueError(f"campaign seed has duplicate {field} references")
+            for item in raw_principals:
+                role = str(item.get("role") or "player")
+                if role not in CAMPAIGN_ROLES:
+                    raise ValueError(f"unsupported campaign seed role: {role}")
             bindings: dict[str, str] = {}
-            for item in content.get("principals", []):
+            for item in raw_principals:
                 target_id = required_id(item.get("id"), "principal.id")
                 if session.get(Principal, target_id) is None:
                     session.add(
@@ -627,7 +841,7 @@ class NarrativeRuntime:
                         )
                     )
             session.flush()
-            for item in content.get("principals", []):
+            for item in raw_principals:
                 target_id = required_id(item.get("id"), "principal.id")
                 membership = session.get(
                     CampaignMembership,
@@ -644,10 +858,10 @@ class NarrativeRuntime:
                 elif target_id != principal_id:
                     membership.role = str(item.get("role") or membership.role)
             session.flush()
-            for item in content.get("actors", []):
+            for item in raw_actors:
                 actor_ref = required_id(item.get("id"), "actor.id")
                 self._validate_actor_profile(profile, item)
-                if actor_ref in document["actor_bindings"]:
+                if actor_ref in document["actor_bindings"] or actor_ref in bindings:
                     raise ValueError(f"campaign seed actor reference collision: {actor_ref}")
                 core_id = str(uuid.uuid4())
                 session.add(
@@ -665,7 +879,7 @@ class NarrativeRuntime:
                 bindings[actor_ref] = core_id
             session.flush()
             document["actor_bindings"].update(bindings)
-            for item in content.get("principals", []):
+            for item in raw_principals:
                 target_id = str(item["id"])
                 for actor_ref in item.get("actor_grants", []):
                     core_id = document["actor_bindings"].get(actor_ref)
@@ -691,7 +905,66 @@ class NarrativeRuntime:
                                 can_view_private=True,
                             )
                         )
-            for item in content.get("records", []):
+            seed_element_grants: dict[tuple[str, str], dict[str, Any]] = {}
+            valid_element_refs = set(record_ids) | set(actor_refs)
+            declared_grants: list[tuple[str, Any]] = []
+            for item in raw_principals:
+                declared_grants.extend(
+                    (str(item["id"]), raw_grant)
+                    for raw_grant in item.get("element_grants") or []
+                )
+            raw_stewardship = content.get("element_stewardship") or []
+            if not isinstance(raw_stewardship, list) or len(raw_stewardship) > 5000:
+                raise ValueError("campaign_seed element_stewardship must be a bounded array")
+            for raw_grant in raw_stewardship:
+                if not isinstance(raw_grant, Mapping):
+                    raise ValueError("element_stewardship entries must be objects")
+                declared_grants.append(
+                    (
+                        required_id(
+                            raw_grant.get("principal_id"),
+                            "element_stewardship.principal_id",
+                        ),
+                        raw_grant,
+                    )
+                )
+            for target_id, raw_grant in declared_grants:
+                    if target_id not in set(principal_ids):
+                        raise ValueError(f"unknown seed element principal: {target_id}")
+                    grant_data = (
+                        {"element_ref": raw_grant}
+                        if isinstance(raw_grant, str)
+                        else deepcopy(dict(raw_grant))
+                    )
+                    element_ref = required_id(
+                        grant_data.get("element_ref"), "element_grant.element_ref"
+                    )
+                    if element_ref not in valid_element_refs:
+                        raise ValueError(f"unknown seed element grant reference: {element_ref}")
+                    raw_scope = grant_data.get("scope") or {}
+                    if not isinstance(raw_scope, Mapping):
+                        raise ValueError("element_grant.scope must be an object")
+                    scope_value = deepcopy(dict(raw_scope))
+                    if set(scope_value) - {"mode", "scene_id"}:
+                        raise ValueError("element_grant.scope supports only mode and scene_id")
+                    if scope_value.get("mode") not in {None, "campaign", "scene"}:
+                        raise ValueError("element_grant.scope.mode must be campaign or scene")
+                    if scope_value.get("scene_id") is not None:
+                        scope_value["scene_id"] = required_id(
+                            scope_value["scene_id"], "element_grant.scope.scene_id"
+                        )
+                    seed_element_grants[(target_id, element_ref)] = {
+                            "principal_id": target_id,
+                            "element_ref": element_ref,
+                            "can_control": bool(grant_data.get("can_control", True)),
+                            "can_view_private": bool(
+                                grant_data.get("can_view_private", True)
+                            ),
+                            "scope": scope_value,
+                        }
+            materialized_element_grants = list(seed_element_grants.values())
+            document["element_grants"].extend(materialized_element_grants)
+            for item in raw_records:
                 normalized = validate_record(item)
                 self._validate_record_profile(profile, normalized)
                 if normalized["id"] in document["records"]:
@@ -701,7 +974,7 @@ class NarrativeRuntime:
                 normalized["revision"] = 1
                 document["records"][normalized["id"]] = normalized
             knowledge_results = []
-            for item in content.get("actor_knowledge", []):
+            for item in raw_knowledge:
                 knowledge = deepcopy(dict(item))
                 actor_ref = required_id(knowledge.get("actor_id"), "actor_knowledge.actor_id")
                 core_actor_id = document["actor_bindings"].get(actor_ref)
@@ -753,7 +1026,8 @@ class NarrativeRuntime:
                 "pack_key": pack_key,
                 "actor_bindings": bindings,
                 "actors_created": len(bindings),
-                "records_materialized": len(content.get("records", [])),
+                "records_materialized": len(raw_records),
+                "element_grants_materialized": len(materialized_element_grants),
                 "actor_knowledge_materialized": len(knowledge_results),
                 "status": "applied",
             }
@@ -763,8 +1037,9 @@ class NarrativeRuntime:
                 operation="narrative.seed.apply",
                 actor=principal_id,
                 branch_id=branch.id,
-                idempotency_key=idempotency_key,
+                idempotency_key=key,
                 request_hash=request_hash(request),
+                reversible=False,
                 changes=[
                     {
                         "entity_type": "campaign",
@@ -777,7 +1052,7 @@ class NarrativeRuntime:
             self.idempotency.remember_in_session(
                 session,
                 scope,
-                idempotency_key,
+                key,
                 request,
                 response,
                 campaign_id=campaign_id,
@@ -796,14 +1071,87 @@ class NarrativeRuntime:
         membership = self.access.require_campaign(campaign_id, principal_id)
         document = narrative_document(self.campaigns.get(campaign_id).state)
         if kind == "profile":
+            profiles = document["profiles"]
+            if record_id:
+                if record_id == profiles.get("active"):
+                    return {
+                        "profile_key": record_id,
+                        "status": "active",
+                        "profile": deepcopy(profiles["finalized"][record_id]),
+                    }
+                if membership.role in ADMIN_ROLES:
+                    if record_id in profiles["drafts"]:
+                        return {
+                            "profile_key": record_id,
+                            "status": "draft",
+                            "profile": deepcopy(profiles["drafts"][record_id]),
+                        }
+                    if record_id in profiles["finalized"]:
+                        return {
+                            "profile_key": record_id,
+                            "status": "finalized",
+                            "profile": deepcopy(profiles["finalized"][record_id]),
+                        }
+                raise LookupError(record_id)
             return {
                 "active": active_profile(document),
                 "finalized": list(document["profiles"]["finalized"]),
+                **(
+                    {
+                        "drafts": deepcopy(profiles["drafts"]),
+                        "finalized_profiles": deepcopy(profiles["finalized"]),
+                    }
+                    if membership.role in ADMIN_ROLES
+                    else {}
+                ),
             }
         if kind == "pack":
+            packs = document["packs"]
+            if record_id:
+                if membership.role not in ADMIN_ROLES and record_id not in packs["active"]:
+                    raise LookupError(record_id)
+                value = packs["finalized"].get(record_id) or packs["drafts"].get(record_id)
+                if value is None:
+                    raise LookupError(record_id)
+                status = (
+                    "active"
+                    if record_id in packs["active"]
+                    else (
+                        str(packs["imports"].get(record_id, {}).get("status") or "finalized")
+                        if record_id in packs["finalized"]
+                        else "draft"
+                    )
+                )
+                if membership.role not in ADMIN_ROLES:
+                    return {
+                        "pack_key": record_id,
+                        "status": status,
+                        "pack": {
+                            key: deepcopy(value.get(key))
+                            for key in (
+                                "id",
+                                "version",
+                                "title",
+                                "kind",
+                                "profile_requirements",
+                                "dependencies",
+                                "rights",
+                                "checksum",
+                            )
+                        },
+                    }
+                return {"pack_key": record_id, "status": status, "pack": deepcopy(value)}
             return {
-                "active": list(document["packs"]["active"]),
-                "imports": deepcopy(document["packs"]["imports"]),
+                "active": list(packs["active"]),
+                "imports": deepcopy(packs["imports"]),
+                **(
+                    {
+                        "drafts": deepcopy(packs["drafts"]),
+                        "finalized_packs": deepcopy(packs["finalized"]),
+                    }
+                    if membership.role in ADMIN_ROLES
+                    else {}
+                ),
             }
         if kind == "scene":
             values = document["scenes"]
@@ -824,15 +1172,14 @@ class NarrativeRuntime:
                     return True
                 bindings = dict(document.get("actor_bindings") or {})
                 for actor_ref in audience.get("actor_ids") or []:
-                    try:
-                        self.access.require_actor(
-                            campaign_id,
-                            str(bindings.get(actor_ref) or actor_ref),
-                            principal_id,
-                        )
+                    if self._actor_authorized(
+                        document,
+                        campaign_id=campaign_id,
+                        actor_id=str(bindings.get(actor_ref) or actor_ref),
+                        principal_id=principal_id,
+                        role=membership.role,
+                    ):
                         return True
-                    except PermissionError:
-                        continue
                 return False
             if scope == "actor":
                 actor_refs = []
@@ -841,19 +1188,14 @@ class NarrativeRuntime:
                 actor_refs.extend(str(item) for item in audience.get("actor_ids", []))
                 bindings = dict(document.get("actor_bindings") or {})
                 for actor_ref in actor_refs:
-                    try:
-                        self.access.require_actor(
-                            campaign_id,
-                            str(bindings.get(actor_ref) or actor_ref),
-                            principal_id,
-                        )
+                    if self._actor_authorized(
+                        document,
+                        campaign_id=campaign_id,
+                        actor_id=str(bindings.get(actor_ref) or actor_ref),
+                        principal_id=principal_id,
+                        role=membership.role,
+                    ):
                         return True
-                    except PermissionError:
-                        continue
-                return False
-            if scope == "private_worker":
-                return audience.get("principal_id") == principal_id
-            if scope == "facilitator":
                 return self._record_authorized(
                     document,
                     campaign_id=campaign_id,
@@ -862,6 +1204,10 @@ class NarrativeRuntime:
                     record=value,
                     control=False,
                 )
+            if scope == "private_worker":
+                return audience.get("principal_id") == principal_id
+            if scope == "facilitator":
+                return False
             return self._record_authorized(
                 document,
                 campaign_id=campaign_id,
@@ -955,6 +1301,57 @@ class NarrativeRuntime:
         if membership.role == "observer":
             raise PermissionError("observer role is read-only")
 
+        def authorized(document: Mapping[str, Any], value: Mapping[str, Any]) -> bool:
+            if self._has_facilitator_authority(document, membership.role):
+                return True
+            scene_participants = [str(item) for item in value.get("participants") or []]
+            if scene_participants and any(
+                self._actor_authorized(
+                    document,
+                    campaign_id=campaign_id,
+                    actor_id=actor_ref,
+                    principal_id=common["principal_id"],
+                    role=membership.role,
+                    control=True,
+                )
+                for actor_ref in scene_participants
+                if actor_ref
+            ):
+                return True
+            for steward in value.get("active_stewards") or []:
+                if not isinstance(steward, Mapping):
+                    continue
+                if steward.get("principal_id") != common["principal_id"]:
+                    continue
+                refs = [str(item) for item in steward.get("element_refs") or []]
+                if not refs:
+                    continue
+                scene_ref = str(value.get("id") or document.get("active_scene_id") or "")
+
+                def controls(ref: str) -> bool:
+                    for grant in document.get("element_grants", []):
+                        if (
+                            grant.get("principal_id") != common["principal_id"]
+                            or grant.get("element_ref") != ref
+                            or not grant.get("can_control")
+                        ):
+                            continue
+                        grant_scene = str(dict(grant.get("scope") or {}).get("scene_id") or "")
+                        if not grant_scene or grant_scene == scene_ref:
+                            return True
+                    return self._actor_authorized(
+                        document,
+                        campaign_id=campaign_id,
+                        actor_id=ref,
+                        principal_id=common["principal_id"],
+                        role=membership.role,
+                        control=True,
+                    )
+
+                if all(controls(ref) for ref in refs):
+                    return True
+            return False
+
         def mutate(document: dict[str, Any]) -> dict[str, Any]:
             if document["phase"] != PHASE_PLAY:
                 raise ValueError("scene changes require play phase")
@@ -963,11 +1360,23 @@ class NarrativeRuntime:
                     raise ValueError("close the current scene before starting another")
                 value = deepcopy(dict(scene or {}))
                 identifier = required_id(value.get("id"), "scene.id")
+                if identifier in document["scenes"]:
+                    raise ValueError("scene already exists")
+                if not authorized(document, value):
+                    raise PermissionError("scene start requires facilitator or active stewardship")
                 value.update({"id": identifier, "status": "active", "revision": 1})
                 value["title"] = required_text(
                     value.get("title") or identifier, "scene.title", limit=200
                 )
-                value["audience"] = deepcopy(dict(value.get("audience") or {"scope": "table"}))
+                value["audience"] = validate_audience(
+                    value.get("audience"), field="scene.audience"
+                )
+                profile = active_profile(document)
+                allowed_audiences = set(
+                    dict(profile.get("authority") or {}).get("audience_scopes") or []
+                ) if profile else set()
+                if allowed_audiences and value["audience"]["scope"] not in allowed_audiences:
+                    raise ValueError("scene audience is not allowed by the active profile")
                 document["scenes"][identifier] = value
                 document["active_scene_id"] = identifier
                 return {"scene": value}
@@ -975,10 +1384,25 @@ class NarrativeRuntime:
             value = document["scenes"].get(identifier)
             if value is None or document.get("active_scene_id") != identifier:
                 raise ValueError("scene is not active")
+            if not authorized(document, value):
+                raise PermissionError("scene mutation belongs to its facilitator or steward")
             if action == "update":
                 changes = deepcopy(dict(scene or {}))
-                for protected in ("id", "status", "revision"):
+                for protected in ("id", "status", "revision", "active_stewards"):
                     changes.pop(protected, None)
+                if "audience" in changes:
+                    changes["audience"] = validate_audience(
+                        changes["audience"], field="scene.audience"
+                    )
+                    profile = active_profile(document)
+                    allowed_audiences = set(
+                        dict(profile.get("authority") or {}).get("audience_scopes") or []
+                    ) if profile else set()
+                    if (
+                        allowed_audiences
+                        and changes["audience"]["scope"] not in allowed_audiences
+                    ):
+                        raise ValueError("scene audience is not allowed by the active profile")
                 value.update(changes)
                 value["revision"] += 1
             elif action == "end":
@@ -1000,22 +1424,32 @@ class NarrativeRuntime:
     def actor_query(
         self, campaign_id: str, *, principal_id: str, actor_id: str | None = None
     ) -> dict[str, Any]:
-        self.access.require_campaign(campaign_id, principal_id)
-        bindings = narrative_document(self.campaigns.get(campaign_id).state).get(
-            "actor_bindings", {}
-        )
+        membership = self.access.require_campaign(campaign_id, principal_id)
+        document = narrative_document(self.campaigns.get(campaign_id).state)
+        bindings = document.get("actor_bindings", {})
         if actor_id:
             core_id = str(bindings.get(actor_id) or actor_id)
-            self.access.require_actor(campaign_id, core_id, principal_id)
+            if not self._actor_authorized(
+                document,
+                campaign_id=campaign_id,
+                actor_id=core_id,
+                principal_id=principal_id,
+                role=membership.role,
+            ):
+                raise PermissionError(f"principal cannot access actor: {actor_id}")
             result = asdict(self.characters.get(core_id))
             aliases = [key for key, value in bindings.items() if value == core_id]
             result["actor_ref"] = aliases[0] if aliases else core_id
             return result
         visible = []
         for actor in self.characters.list(campaign_id=campaign_id):
-            try:
-                self.access.require_actor(campaign_id, actor.id, principal_id)
-            except PermissionError:
+            if not self._actor_authorized(
+                document,
+                campaign_id=campaign_id,
+                actor_id=actor.id,
+                principal_id=principal_id,
+                role=membership.role,
+            ):
                 continue
             value = asdict(actor)
             aliases = [key for key, core_id in bindings.items() if core_id == actor.id]
@@ -1060,13 +1494,14 @@ class NarrativeRuntime:
         if not expected_branch_id:
             expected_branch_id = self.branch_id(campaign_id)
         self.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
+        key = required_text(idempotency_key, "idempotency_key", limit=200)
         value = deepcopy(actor)
         name = required_text(value.get("name"), "actor.name", limit=200)
         actor_id = str(uuid.uuid4())
         payload = {"actor": value, "expected_revision": expected_revision}
         scope = f"narrative:actor.create:{campaign_id}:{expected_branch_id}:{principal_id}"
         with self.database.transaction() as session:
-            replay = self.idempotency.lookup_in_session(session, scope, idempotency_key, payload)
+            replay = self.idempotency.lookup_in_session(session, scope, key, payload)
             if replay and replay.response:
                 return deepcopy(replay.response)
             campaign = session.get(Campaign, campaign_id)
@@ -1076,6 +1511,12 @@ class NarrativeRuntime:
                 or campaign.active_branch_id != expected_branch_id
             ):
                 raise ValueError("campaign revision or branch conflict")
+            document = narrative_document(campaign.state)
+            if any(
+                item.get("status") == "open"
+                for item in document.get("npc_conversations", {}).values()
+            ):
+                raise ValueError("close or abort every NPC conversation before actor creation")
             actor_row = Character(
                 id=actor_id,
                 system_id="narrative",
@@ -1087,7 +1528,7 @@ class NarrativeRuntime:
                 sheet=deepcopy(dict(value.get("sheet") or {})),
                 notes=deepcopy(dict(value.get("notes") or {})),
             )
-            self._validate_actor_profile(active_profile(narrative_document(campaign.state)), value)
+            self._validate_actor_profile(active_profile(document), value)
             session.add(actor_row)
             before = deepcopy(campaign.state)
             changed = session.execute(
@@ -1122,8 +1563,9 @@ class NarrativeRuntime:
                 operation="narrative.actor.create",
                 actor=principal_id,
                 branch_id=expected_branch_id,
-                idempotency_key=idempotency_key,
+                idempotency_key=key,
                 request_hash=request_hash(payload),
+                reversible=False,
                 changes=[
                     {
                         "entity_type": "campaign",
@@ -1136,7 +1578,161 @@ class NarrativeRuntime:
             self.idempotency.remember_in_session(
                 session,
                 scope,
-                idempotency_key,
+                key,
+                payload,
+                response,
+                campaign_id=campaign_id,
+                mutation_group_id=revisions[0].mutation_group_id,
+            )
+            return response
+
+    def actor_update(
+        self,
+        campaign_id: str,
+        *,
+        principal_id: str,
+        actor_id: str,
+        actor: dict[str, Any],
+        expected_actor_revision: int,
+        expected_revision: int,
+        expected_branch_id: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        membership = self.access.require_campaign(campaign_id, principal_id)
+        key = required_text(idempotency_key, "idempotency_key", limit=200)
+        scope = f"narrative:actor.update:{campaign_id}:{expected_branch_id}:{principal_id}"
+        payload = {
+            "actor_id": actor_id,
+            "actor": deepcopy(actor),
+            "expected_actor_revision": int(expected_actor_revision),
+            "expected_revision": int(expected_revision),
+        }
+        with self.database.transaction() as session:
+            replay = self.idempotency.lookup_in_session(session, scope, key, payload)
+            if replay is not None and replay.response is not None:
+                return deepcopy(replay.response)
+            campaign = session.get(Campaign, campaign_id)
+            if campaign is None:
+                raise LookupError(campaign_id)
+            branch = resolve_branch(session, campaign)
+            if branch.id != expected_branch_id or campaign.revision != int(expected_revision):
+                raise ValueError("campaign revision or branch conflict")
+            document = narrative_document(campaign.state)
+            core_actor_id = str(document.get("actor_bindings", {}).get(actor_id) or actor_id)
+            if not self._actor_authorized(
+                document,
+                campaign_id=campaign_id,
+                actor_id=core_actor_id,
+                principal_id=principal_id,
+                role=membership.role,
+                control=True,
+            ):
+                raise PermissionError("actor update requires actor control")
+            if any(
+                item.get("status") == "open"
+                for item in document.get("npc_conversations", {}).values()
+            ):
+                raise ValueError("close or abort every NPC conversation before actor update")
+            row = session.get(Character, core_actor_id)
+            if row is None or row.campaign_id != campaign_id:
+                raise LookupError(actor_id)
+            if row.revision != int(expected_actor_revision):
+                raise ValueError("actor revision conflict")
+            changes = deepcopy(dict(actor))
+            proposed = {
+                "name": changes.get("name", row.name),
+                "type": changes.get("type", row.character_type),
+                "player_name": changes.get("player_name", row.player_name),
+                "summary": changes.get("summary", row.summary),
+                "sheet": changes.get("sheet", row.sheet),
+                "notes": changes.get("notes", row.notes),
+            }
+            proposed["name"] = required_text(proposed["name"], "actor.name", limit=200)
+            proposed["type"] = required_id(proposed["type"], "actor.type")
+            proposed["sheet"] = deepcopy(dict(proposed.get("sheet") or {}))
+            proposed["notes"] = deepcopy(dict(proposed.get("notes") or {}))
+            self._validate_actor_profile(active_profile(document), proposed)
+            changed_actor = session.execute(
+                update(Character)
+                .where(
+                    Character.id == core_actor_id,
+                    Character.campaign_id == campaign_id,
+                    Character.revision == int(expected_actor_revision),
+                )
+                .values(
+                    name=proposed["name"],
+                    character_type=proposed["type"],
+                    player_name=proposed["player_name"],
+                    summary=str(proposed["summary"] or ""),
+                    sheet=proposed["sheet"],
+                    notes=proposed["notes"],
+                    revision=Character.revision + 1,
+                )
+                .returning(Character.revision)
+            ).scalar_one_or_none()
+            if changed_actor is None:
+                raise ValueError("actor revision conflict during conditional update")
+            changed_campaign = session.execute(
+                update(Campaign)
+                .where(
+                    Campaign.id == campaign_id,
+                    Campaign.revision == int(expected_revision),
+                    Campaign.active_branch_id == expected_branch_id,
+                )
+                .values(revision=Campaign.revision + 1)
+                .returning(Campaign.revision)
+            ).scalar_one_or_none()
+            if changed_campaign is None:
+                raise ValueError("campaign revision conflict during actor update")
+            response = {
+                "id": core_actor_id,
+                "actor_ref": actor_id,
+                "campaign_id": campaign_id,
+                "character_type": proposed["type"],
+                "name": proposed["name"],
+                "player_name": proposed["player_name"],
+                "summary": str(proposed["summary"] or ""),
+                "sheet": proposed["sheet"],
+                "notes": proposed["notes"],
+                "revision": int(changed_actor),
+                "campaign_revision": int(changed_campaign),
+                "branch_id": branch.id,
+                "phase": document["phase"],
+            }
+            revisions = self.revisions.record_group_in_session(
+                session,
+                campaign_id,
+                operation="narrative.actor.update",
+                actor=principal_id,
+                branch_id=branch.id,
+                idempotency_key=key,
+                request_hash=request_hash(payload),
+                reversible=False,
+                changes=[
+                    {
+                        "entity_type": "character",
+                        "entity_id": core_actor_id,
+                        "before": {"revision": int(expected_actor_revision)},
+                        "after": {"revision": int(changed_actor)},
+                    },
+                    {
+                        "entity_type": "campaign",
+                        "entity_id": campaign_id,
+                        "before": {
+                            "state": deepcopy(campaign.state),
+                            "revision": int(expected_revision),
+                        },
+                        "after": {
+                            "state": deepcopy(campaign.state),
+                            "revision": int(changed_campaign),
+                        },
+                    },
+                ],
+            )
+            self.idempotency.remember_in_session(
+                session,
+                scope,
+                key,
                 payload,
                 response,
                 campaign_id=campaign_id,
@@ -1162,10 +1758,10 @@ class NarrativeRuntime:
         idempotency_key: str | None = None,
     ) -> dict[str, Any]:
         self.access.require_campaign(campaign_id, principal_id, roles={"owner"})
-        if action in {"campaign_grant", "actor_grant"}:
+        if action in {"campaign_grant", "campaign_revoke", "actor_grant", "actor_revoke"}:
             if expected_revision is None or not expected_branch_id or not idempotency_key:
-                raise ValueError("access grants require revision, branch, and idempotency")
-            if action == "actor_grant" and not actor_id:
+                raise ValueError("access changes require revision, branch, and idempotency")
+            if action in {"actor_grant", "actor_revoke"} and not actor_id:
                 raise ValueError("actor_id is required")
             payload = {
                 "action": action,
@@ -1194,7 +1790,15 @@ class NarrativeRuntime:
                 if campaign.revision != int(expected_revision) or branch.id != expected_branch_id:
                     raise ValueError("campaign revision or branch conflict")
                 before = deepcopy(campaign.state)
+                document = narrative_document(campaign.state)
+                if any(
+                    item.get("status") == "open"
+                    for item in document.get("npc_conversations", {}).values()
+                ):
+                    raise ValueError("close or abort every NPC conversation before access changes")
                 target = session.get(Principal, target_principal_id)
+                if target is None and action in {"campaign_revoke", "actor_revoke"}:
+                    raise LookupError(target_principal_id)
                 if target is None:
                     target = Principal(
                         id=target_principal_id,
@@ -1205,7 +1809,7 @@ class NarrativeRuntime:
                     )
                     session.add(target)
                     session.flush()
-                if action == "campaign_grant":
+                if action in {"campaign_grant", "campaign_revoke"}:
                     grant_row = session.get(
                         CampaignMembership,
                         {
@@ -1213,27 +1817,83 @@ class NarrativeRuntime:
                             "principal_id": target_principal_id,
                         },
                     )
-                    normalized_role = required_id(role or "player", "role")
-                    if grant_row is None:
-                        grant_row = CampaignMembership(
-                            campaign_id=campaign_id,
-                            principal_id=target_principal_id,
-                            role=normalized_role,
+                    if action == "campaign_revoke":
+                        if grant_row is None:
+                            raise LookupError(target_principal_id)
+                        if grant_row.role == "owner":
+                            owners = list(
+                                session.scalars(
+                                    select(CampaignMembership).where(
+                                        CampaignMembership.campaign_id == campaign_id,
+                                        CampaignMembership.role == "owner",
+                                    )
+                                )
+                            )
+                            if len(owners) <= 1:
+                                raise ValueError("cannot revoke the campaign's last owner")
+                        session.execute(
+                            delete(ActorGrant).where(
+                                ActorGrant.campaign_id == campaign_id,
+                                ActorGrant.principal_id == target_principal_id,
+                            )
                         )
-                        session.add(grant_row)
+                        session.delete(grant_row)
+                        document["element_grants"] = [
+                            item
+                            for item in document.get("element_grants", [])
+                            if item.get("principal_id") != target_principal_id
+                        ]
+                        grant = {
+                            "campaign_id": campaign_id,
+                            "principal_id": target_principal_id,
+                            "status": "revoked",
+                        }
                     else:
-                        grant_row.role = normalized_role
-                    grant = {
-                        "campaign_id": campaign_id,
-                        "principal_id": target_principal_id,
-                        "role": normalized_role,
-                    }
+                        normalized_role = str(role or "player")
+                        if normalized_role not in CAMPAIGN_ROLES:
+                            raise ValueError(f"unsupported campaign role: {normalized_role}")
+                        if (
+                            grant_row is not None
+                            and grant_row.role == "owner"
+                            and normalized_role != "owner"
+                        ):
+                            owners = list(
+                                session.scalars(
+                                    select(CampaignMembership).where(
+                                        CampaignMembership.campaign_id == campaign_id,
+                                        CampaignMembership.role == "owner",
+                                    )
+                                )
+                            )
+                            if len(owners) <= 1:
+                                raise ValueError("cannot demote the campaign's last owner")
+                        if grant_row is None:
+                            grant_row = CampaignMembership(
+                                campaign_id=campaign_id,
+                                principal_id=target_principal_id,
+                                role=normalized_role,
+                            )
+                            session.add(grant_row)
+                        else:
+                            grant_row.role = normalized_role
+                        grant = {
+                            "campaign_id": campaign_id,
+                            "principal_id": target_principal_id,
+                            "role": normalized_role,
+                            "status": "granted",
+                        }
                 else:
-                    document = narrative_document(campaign.state)
+                    membership_row = session.get(
+                        CampaignMembership,
+                        {"campaign_id": campaign_id, "principal_id": target_principal_id},
+                    )
+                    if membership_row is None:
+                        raise ValueError("actor grant target must be a campaign member")
                     core_actor_id = str(
                         document.get("actor_bindings", {}).get(actor_id) or actor_id
                     )
-                    if session.get(Character, core_actor_id) is None:
+                    actor_row = session.get(Character, core_actor_id)
+                    if actor_row is None or actor_row.campaign_id != campaign_id:
                         raise LookupError(str(actor_id))
                     grant_row = session.get(
                         ActorGrant,
@@ -1243,7 +1903,11 @@ class NarrativeRuntime:
                             "actor_id": core_actor_id,
                         },
                     )
-                    if grant_row is None:
+                    if action == "actor_revoke":
+                        if grant_row is None:
+                            raise LookupError(f"{target_principal_id}:{actor_id}")
+                        session.delete(grant_row)
+                    elif grant_row is None:
                         grant_row = ActorGrant(
                             campaign_id=campaign_id,
                             principal_id=target_principal_id,
@@ -1262,6 +1926,7 @@ class NarrativeRuntime:
                         "actor_ref": actor_id,
                         "can_control": bool(can_control),
                         "can_view_private": bool(can_view_private),
+                        "status": "revoked" if action == "actor_revoke" else "granted",
                     }
                 changed = session.execute(
                     update(Campaign)
@@ -1270,11 +1935,14 @@ class NarrativeRuntime:
                         Campaign.revision == int(expected_revision),
                         Campaign.active_branch_id == expected_branch_id,
                     )
-                    .values(revision=Campaign.revision + 1)
+                    .values(
+                        state=state_with_narrative(before, document),
+                        revision=Campaign.revision + 1,
+                    )
                     .returning(Campaign.revision)
                 ).scalar_one_or_none()
                 if changed is None:
-                    raise ValueError("campaign revision conflict during access grant")
+                    raise ValueError("campaign revision conflict during access change")
                 response = {
                     **grant,
                     "campaign_revision": int(changed),
@@ -1289,17 +1957,8 @@ class NarrativeRuntime:
                     branch_id=branch.id,
                     idempotency_key=key,
                     request_hash=request_hash(payload),
+                    reversible=False,
                     changes=[
-                        {
-                            "entity_type": action,
-                            "entity_id": (
-                                target_principal_id
-                                if action == "campaign_grant"
-                                else f"{target_principal_id}:{grant['actor_id']}"
-                            ),
-                            "before": None,
-                            "after": deepcopy(grant),
-                        },
                         {
                             "entity_type": "campaign",
                             "entity_id": campaign_id,
@@ -1307,7 +1966,10 @@ class NarrativeRuntime:
                                 "state": before,
                                 "revision": int(expected_revision),
                             },
-                            "after": {"state": before, "revision": int(changed)},
+                            "after": {
+                                "state": state_with_narrative(before, document),
+                                "revision": int(changed),
+                            },
                         },
                     ],
                 )
@@ -1325,6 +1987,20 @@ class NarrativeRuntime:
             if expected_revision is None or not expected_branch_id or not idempotency_key:
                 raise ValueError("element grants require revision, branch, and idempotency")
             normalized_ref = required_id(element_ref, "element_ref")
+            if self.access.membership(campaign_id, target_principal_id) is None:
+                raise ValueError("element grant target must be a campaign member")
+            raw_scope = scope or {}
+            if not isinstance(raw_scope, Mapping):
+                raise ValueError("element grant scope must be an object")
+            normalized_scope = deepcopy(dict(raw_scope))
+            if set(normalized_scope) - {"mode", "scene_id"}:
+                raise ValueError("element grant scope supports only mode and scene_id")
+            if normalized_scope.get("mode") not in {None, "campaign", "scene"}:
+                raise ValueError("element grant scope mode must be campaign or scene")
+            if normalized_scope.get("scene_id") is not None:
+                normalized_scope["scene_id"] = required_id(
+                    normalized_scope["scene_id"], "scope.scene_id"
+                )
 
             def mutate(document: dict[str, Any]) -> dict[str, Any]:
                 grants = list(document["element_grants"])
@@ -1343,7 +2019,7 @@ class NarrativeRuntime:
                             "element_ref": normalized_ref,
                             "can_control": bool(can_control),
                             "can_view_private": bool(can_view_private),
-                            "scope": deepcopy(dict(scope or {})),
+                            "scope": normalized_scope,
                         }
                     )
                 document["element_grants"] = grants
@@ -1365,7 +2041,7 @@ class NarrativeRuntime:
                     "element_ref": normalized_ref,
                     "can_control": can_control,
                     "can_view_private": can_view_private,
-                    "scope": scope,
+                    "scope": normalized_scope,
                 },
                 mutate=mutate,
                 roles={"owner"},
@@ -1401,20 +2077,35 @@ class NarrativeRuntime:
         bindings = dict(document.get("actor_bindings") or {})
         for actor_ref in actor_refs:
             try:
-                self.access.require_actor(
-                    campaign_id,
-                    str(bindings.get(actor_ref) or actor_ref),
-                    principal_id,
+                if self._actor_authorized(
+                    document,
+                    campaign_id=campaign_id,
+                    actor_id=str(bindings.get(actor_ref) or actor_ref),
+                    principal_id=principal_id,
+                    role=role,
                     control=control,
                     private=not control,
-                )
-                return True
-            except PermissionError:
+                ):
+                    return True
+            except (LookupError, PermissionError):
                 continue
         element_ref = str(controller.get("element_ref") or record.get("id") or "")
+        # Pack data names actors by stable logical references while live calls
+        # may carry the authoritative core UUID returned during seed
+        # materialization. Element stewardship is defined over the stable Pack
+        # reference, so accept either representation at the write boundary.
+        element_refs = {element_ref}
+        element_refs.update(
+            logical_ref
+            for logical_ref, authoritative_id in bindings.items()
+            if str(authoritative_id) == element_ref
+        )
         scene_id = document.get("active_scene_id")
         for grant in document.get("element_grants", []):
-            if grant.get("principal_id") != principal_id or grant.get("element_ref") != element_ref:
+            if (
+                grant.get("principal_id") != principal_id
+                or grant.get("element_ref") not in element_refs
+            ):
                 continue
             grant_scope = dict(grant.get("scope") or {})
             if grant_scope.get("scene_id") and grant_scope["scene_id"] != scene_id:
@@ -1551,13 +2242,13 @@ class NarrativeRuntime:
             "selected_proposal_ids": _selected_proposal_ids or [],
             "private_worker_id": _private_worker_id,
         }
-        replay = self.idempotency.lookup(scope, key, request)
-        if replay is not None and replay.response is not None:
-            return deepcopy(replay.response)
         membership = self.access.require_campaign(campaign_id, principal_id)
         role = membership.role
         if role == "observer":
             raise PermissionError("observer role is read-only")
+        replay = self.idempotency.lookup(scope, key, request)
+        if replay is not None and replay.response is not None:
+            return deepcopy(replay.response)
         with self.database.transaction() as session:
             campaign = session.get(Campaign, campaign_id)
             if campaign is None:
@@ -1577,12 +2268,17 @@ class NarrativeRuntime:
                     actor_ref = required_text(
                         participant.get("actor_id"), "event participant actor_id", limit=200
                     )
-                    self.access.require_actor(
-                        campaign_id,
-                        actor_bindings.get(actor_ref, actor_ref),
-                        principal_id,
+                    if not self._actor_authorized(
+                        document,
+                        campaign_id=campaign_id,
+                        actor_id=actor_bindings.get(actor_ref, actor_ref),
+                        principal_id=principal_id,
+                        role=role,
                         control=True,
-                    )
+                    ):
+                        raise PermissionError(
+                            f"principal does not control event participant: {actor_ref}"
+                        )
             open_conversations = [
                 item
                 for item in document.get("npc_conversations", {}).values()
@@ -1679,7 +2375,15 @@ class NarrativeRuntime:
                         continue
                     actor_id = actor_bindings.get(subject_ref, subject_ref)
                     try:
-                        self.access.require_actor(campaign_id, actor_id, principal_id, control=True)
+                        if not self._actor_authorized(
+                            document,
+                            campaign_id=campaign_id,
+                            actor_id=actor_id,
+                            principal_id=principal_id,
+                            role=role,
+                            control=True,
+                        ):
+                            raise PermissionError(actor_id)
                         has_authorized_fact = True
                     except (LookupError, PermissionError) as error:
                         if self._record_authorized(
@@ -1699,7 +2403,17 @@ class NarrativeRuntime:
             for item in actor_knowledge or []:
                 actor_ref = str(item.get("actor_id") or "")
                 actor_id = document.get("actor_bindings", {}).get(actor_ref, actor_ref)
-                self.access.require_actor(campaign_id, actor_id, principal_id, control=True)
+                if not self._actor_authorized(
+                    document,
+                    campaign_id=campaign_id,
+                    actor_id=actor_id,
+                    principal_id=principal_id,
+                    role=role,
+                    control=True,
+                ):
+                    raise PermissionError(
+                        f"principal does not control actor knowledge target: {actor_ref}"
+                    )
             before = {"state": deepcopy(campaign.state), "revision": campaign.revision}
             if (
                 not self._has_facilitator_authority(document, role)
@@ -1768,6 +2482,7 @@ class NarrativeRuntime:
                 branch_id=branch.id,
                 idempotency_key=key,
                 request_hash=request_hash(request),
+                reversible=False,
                 changes=[
                     {
                         "entity_type": "campaign",
@@ -1802,7 +2517,7 @@ class NarrativeRuntime:
                     {
                         "id": closed_conversation["id"],
                         "status": "closed",
-                        "accepted_proposals": accepted_proposals,
+                        "accepted_proposal_ids": [item["id"] for item in accepted_proposals],
                         "publications": deepcopy(closed_conversation.get("publications", [])),
                     }
                     if closed_conversation
@@ -1831,6 +2546,13 @@ class NarrativeRuntime:
         **common: Any,
     ) -> dict[str, Any]:
         if action == "close" and (data or {}).get("settlement") is not None:
+            current_profile = active_profile(
+                narrative_document(self.campaigns.get(campaign_id).state)
+            )
+            if not current_profile or "npc_conversation" not in set(
+                current_profile.get("capabilities") or []
+            ):
+                raise ValueError("active profile does not provide NPC conversation")
             payload = deepcopy(dict(data or {}))
             settlement = deepcopy(dict(payload.get("settlement") or {}))
             return self.narrative_settle(
@@ -1854,21 +2576,34 @@ class NarrativeRuntime:
 
         def mutate(document: dict[str, Any]) -> dict[str, Any]:
             conversations = document["npc_conversations"]
+            profile = active_profile(document)
+            if not profile or "npc_conversation" not in set(profile.get("capabilities") or []):
+                raise ValueError("active profile does not provide NPC conversation")
             if action == "open":
                 if document["phase"] != PHASE_PLAY or document.get("conflict"):
                     raise ValueError("NPC conversation requires non-conflict Play")
                 actor_id = required_text(npc_actor_id, "npc_actor_id", limit=100)
                 core_actor_id = self.resolve_actor_ref(campaign_id, actor_id)
-                self.access.require_actor(
-                    campaign_id, core_actor_id, common["principal_id"], control=True
-                )
+                membership = self.access.require_campaign(campaign_id, common["principal_id"])
+                if not self._actor_authorized(
+                    document,
+                    campaign_id=campaign_id,
+                    actor_id=core_actor_id,
+                    principal_id=common["principal_id"],
+                    role=membership.role,
+                    control=True,
+                ):
+                    raise PermissionError("NPC conversation requires actor control")
                 identifier = f"npc_{uuid4().hex}"
+                worker_id = required_text(
+                    (data or {}).get("private_worker_id"), "private_worker_id", limit=200
+                )
                 conversations[identifier] = {
                     "id": identifier,
                     "npc_actor_id": actor_id,
                     "status": "open",
                     "context_revision": int(common["expected_revision"]) + 1,
-                    "private_worker_id": str((data or {}).get("private_worker_id") or ""),
+                    "private_worker_id": worker_id,
                     "owner_principal_id": common["principal_id"],
                     "proposals": [],
                     "publications": [],
@@ -1880,7 +2615,10 @@ class NarrativeRuntime:
                 raise ValueError("NPC conversation is not open")
             if value.get("owner_principal_id") != common["principal_id"]:
                 raise PermissionError("NPC conversation belongs to another principal")
-            if int(value["context_revision"]) != int(common["expected_revision"]):
+            if (
+                action != "abort"
+                and int(value["context_revision"]) != int(common["expected_revision"])
+            ):
                 raise ValueError("NPC conversation context is stale")
             payload = deepcopy(dict(data or {}))
             supplied_worker = str(payload.pop("private_worker_id", "") or "")
@@ -1907,8 +2645,15 @@ class NarrativeRuntime:
                     "content": required_text(
                         payload.get("content"), "publication.content", limit=4000
                     ),
-                    "audience": deepcopy(dict(payload.get("audience") or {"scope": "table"})),
+                    "audience": validate_audience(
+                        payload.get("audience"), field="publication.audience"
+                    ),
                 }
+                allowed_audiences = set(
+                    dict(profile.get("authority") or {}).get("audience_scopes") or []
+                )
+                if allowed_audiences and publication["audience"]["scope"] not in allowed_audiences:
+                    raise ValueError("publication audience is not allowed by the active profile")
                 value["publications"].append(publication)
                 value["context_revision"] = int(common["expected_revision"]) + 1
                 return {"conversation_id": identifier, "publication": publication}
@@ -1920,7 +2665,7 @@ class NarrativeRuntime:
                 missing_ids = [item for item in selected_ids if item not in proposal_by_id]
                 if missing_ids:
                     raise LookupError("unknown selected NPC proposal: " + ", ".join(missing_ids))
-                value["status"] = action + "d"
+                value["status"] = "closed" if action == "close" else "aborted"
                 value["accepted_proposals"] = (
                     [deepcopy(proposal_by_id[item]) for item in selected_ids]
                     if action == "close"
@@ -1955,28 +2700,49 @@ class NarrativeRuntime:
         activity: str,
         summary: str,
         changes: list[dict[str, Any]],
+        facts: list[dict[str, Any]] | None = None,
+        actor_knowledge: list[dict[str, Any]] | None = None,
+        snapshot: dict[str, Any] | None = None,
+        audience_scope: str = "public",
+        participants: list[dict[str, Any]] | None = None,
+        payload: dict[str, Any] | None = None,
         **common: Any,
     ) -> dict[str, Any]:
         if activity not in {"downtime", "world_turn"}:
             raise ValueError("unsupported activity")
+        document = narrative_document(self.campaigns.get(campaign_id).state)
+        profile = active_profile(document)
+        required_capability = "downtime" if activity == "downtime" else "world_turn"
+        if document["phase"] != PHASE_PLAY:
+            raise ValueError(f"{activity} requires play phase")
+        if not profile or required_capability not in set(profile.get("capabilities") or []):
+            raise ValueError(f"active profile does not provide {activity}")
         if activity == "world_turn":
             membership = self.access.require_campaign(campaign_id, common["principal_id"])
-            profile = active_profile(narrative_document(self.campaigns.get(campaign_id).state))
             if (
                 profile
                 and dict(profile.get("authority") or {}).get(
                     "world_turn_requires_facilitator", False
                 )
                 and not self._has_facilitator_authority(
-                    narrative_document(self.campaigns.get(campaign_id).state),
+                    document,
                     membership.role,
                 )
             ):
                 raise PermissionError("world turn requires facilitator authority")
         return self.narrative_settle(
             campaign_id,
-            event={"event_type": activity, "summary": summary, "audience_scope": "public"},
+            event={
+                "event_type": activity,
+                "summary": summary,
+                "audience_scope": audience_scope,
+                "participants": deepcopy(participants or []),
+                "payload": deepcopy(payload or {}),
+            },
             record_changes=changes,
+            facts=facts,
+            actor_knowledge=actor_knowledge,
+            snapshot=snapshot,
             principal_id=common["principal_id"],
             expected_revision=common["expected_revision"],
             expected_branch_id=common["expected_branch_id"],

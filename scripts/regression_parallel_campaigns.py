@@ -156,7 +156,6 @@ class StdioRouteBackend:
         )
 
     async def context(self) -> tuple[int, str]:
-        await self.ensure_tool("branch_query")
         campaign = await self._raw(
             "campaign_query",
             {
@@ -165,12 +164,11 @@ class StdioRouteBackend:
                 "principal_id": self.principal_id(),
             },
         )
-        branches = await self._raw(
-            "branch_query",
-            {"campaign_id": self.campaign_id, "principal_id": self.principal_id()},
-        )
-        branch = next(item for item in branches["branches"] if item["is_current"])
-        return int(campaign["revision"]), str(branch["id"])
+        binding = dict(campaign.get("host_context_binding") or {})
+        branch_id = str(binding.get("branch_id") or "")
+        if not branch_id:
+            raise RuntimeError("campaign_query did not return a branch binding")
+        return int(campaign["revision"]), branch_id
 
     async def _raw(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
         result = decode(await self.session.call_tool(tool, arguments))
@@ -300,21 +298,9 @@ class StdioRouteBackend:
             )
             self.actor_aliases.update(applied.get("actor_bindings") or {})
             self.seed_knowledge_materialized = bool(applied.get("actor_knowledge_materialized"))
-            # The public seed operation materializes memberships, actors, grants, and records.
+            # The public seed operation materializes memberships, actors, actor/element
+            # grants, records, and initial ActorKnowledge in one transaction.
             for grant in seed.get("content", {}).get("element_stewardship", []):
-                await self.call(
-                    "access_change",
-                    {
-                        "action": "element_grant",
-                        "target_principal_id": grant["principal_id"],
-                        "element_ref": grant["element_ref"],
-                        "can_control": grant.get("can_control", False),
-                        "can_view_private": grant.get("can_view_private", False),
-                        "scope": grant.get("scope") or {},
-                    },
-                    principal=principal,
-                    write=True,
-                )
                 self.element_grants.add((str(grant["principal_id"]), str(grant["element_ref"])))
             self.assertion_root = applied
             return 1 + len(seed.get("content", {}).get("element_stewardship", []))

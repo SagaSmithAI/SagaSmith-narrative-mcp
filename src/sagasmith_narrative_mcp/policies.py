@@ -11,7 +11,8 @@ CORE_TOOLS = frozenset({"exposure", "server_capabilities", "campaign_query", "sk
 
 LOBBY_TOOLS = frozenset(
     "campaign_setup access_change profile_change pack_change actor_change actor_query "
-    "game_phase snapshot_change snapshot_query branch_change branch_query state_revision".split()
+    "game_phase narrative_query snapshot_change snapshot_query branch_change branch_query "
+    "state_revision".split()
 )
 PLAY_TOOLS = frozenset(
     "access_change actor_change actor_query game_phase scene_change continuity_query "
@@ -28,8 +29,8 @@ OPTIONAL_CONFLICT_TOOLS = frozenset(
     {"conflict_start", "conflict_query", "conflict_act", "conflict_end"}
 )
 ADMIN_TOOLS = frozenset(
-    "access_change actor_change profile_change pack_change game_phase branch_change "
-    "state_revision".split()
+    "access_change profile_change pack_change game_phase snapshot_change snapshot_query "
+    "branch_change branch_query state_revision".split()
 )
 NO_CAMPAIGN_TOOLS = frozenset({"campaign_setup"})
 

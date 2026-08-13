@@ -10,6 +10,7 @@ from typing import Any, Literal
 from uuid import uuid4
 from weakref import WeakValueDictionary
 
+import mcp.server.fastmcp.server as fastmcp_server_module
 from mcp.server.fastmcp import FastMCP
 from mcp.server.lowlevel.server import NotificationOptions
 from mcp.types import TextContent
@@ -36,6 +37,13 @@ class SessionExposureFastMCP(FastMCP):
         bound_principal_id: str | None = None,
         **kwargs: Any,
     ) -> None:
+        # mcp 1.29 ships its Settings generic with a deferred lifespan
+        # annotation. pydantic-settings 2.15 correctly warns until the owning
+        # module's namespace is supplied. Rebuild the model instead of hiding
+        # the warning or pinning an older transitive dependency.
+        settings_type = fastmcp_server_module.Settings
+        if not settings_type.__pydantic_complete__:
+            settings_type.model_rebuild(_types_namespace=vars(fastmcp_server_module))
         self.registry = registry
         self.runtime = runtime
         self._bound_principal_id = bound_principal_id.strip() if bound_principal_id else None
@@ -91,19 +99,13 @@ class SessionExposureFastMCP(FastMCP):
         return result
 
     def _allowed(self, exposure: Exposure) -> set[str]:
-        capabilities = (
-            self.runtime.profile_capabilities(exposure.campaign_id)
+        document = (
+            narrative_document(self.runtime.campaigns.get(exposure.campaign_id).state)
             if exposure.campaign_id
-            else set()
+            else None
         )
-        if (
-            capabilities
-            and active_profile(
-                narrative_document(self.runtime.campaigns.get(exposure.campaign_id).state)
-            ).get("mechanics_level")
-            == 1
-        ):
-            capabilities.add("mechanics")
+        profile = active_profile(document) if document else None
+        capabilities = set(profile.get("capabilities", [])) if profile else set()
         result = allowed_tools(exposure.phase, capabilities)
         if exposure.campaign_id:
             membership = self.runtime.access.require_campaign(
@@ -111,8 +113,11 @@ class SessionExposureFastMCP(FastMCP):
             )
             if membership.role not in ADMIN_ROLES:
                 result -= set(ADMIN_TOOLS)
-            document = narrative_document(self.runtime.campaigns.get(exposure.campaign_id).state)
-            profile = active_profile(document)
+                if not self.runtime.principal_controls_actor(
+                    exposure.campaign_id, exposure.principal_id
+                ):
+                    result.discard("actor_change")
+            assert document is not None
             authority = dict(profile.get("authority") or {}) if profile else {}
             facilitator = self.runtime._has_facilitator_authority(document, membership.role)
             actor_conflict_authority = bool(
@@ -405,7 +410,14 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
     @mcp.tool()
     def access_change(
         campaign_id: str,
-        action: Literal["campaign_grant", "actor_grant", "element_grant", "element_revoke"],
+        action: Literal[
+            "campaign_grant",
+            "campaign_revoke",
+            "actor_grant",
+            "actor_revoke",
+            "element_grant",
+            "element_revoke",
+        ],
         target_principal_id: str,
         role: str | None = None,
         actor_id: str | None = None,
@@ -418,13 +430,6 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
         idempotency_key: str = "",
         principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID,
     ) -> dict[str, Any]:
-        runtime._require_branch_revision(
-            campaign_id,
-            principal_id=principal_id,
-            expected_revision=expected_revision,
-            expected_branch_id=expected_branch_id,
-            roles={"owner"},
-        )
         return runtime.access_change(
             campaign_id,
             principal_id=principal_id,
@@ -514,20 +519,28 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
     @mcp.tool()
     def actor_change(
         campaign_id: str,
-        action: Literal["create"],
+        action: Literal["create", "update"],
         actor: dict[str, Any],
         expected_revision: int,
         expected_branch_id: str,
         idempotency_key: str,
+        actor_id: str | None = None,
+        expected_actor_revision: int | None = None,
         principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID,
     ) -> dict[str, Any]:
-        runtime._require_branch_revision(
-            campaign_id,
-            principal_id=principal_id,
-            expected_revision=expected_revision,
-            expected_branch_id=expected_branch_id,
-            roles=ADMIN_ROLES,
-        )
+        if action == "update":
+            if not actor_id or expected_actor_revision is None:
+                raise ValueError("actor update requires actor_id and expected_actor_revision")
+            return runtime.actor_update(
+                campaign_id,
+                principal_id=principal_id,
+                actor_id=actor_id,
+                actor=actor,
+                expected_actor_revision=expected_actor_revision,
+                expected_revision=expected_revision,
+                expected_branch_id=expected_branch_id,
+                idempotency_key=idempotency_key,
+            )
         return runtime.actor_create(
             campaign_id,
             principal_id=principal_id,
@@ -619,8 +632,7 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
     ) -> dict[str, Any]:
         membership = runtime.access.require_campaign(campaign_id, principal_id)
         if actor_id:
-            actor_id = runtime.resolve_actor_ref(campaign_id, actor_id)
-            runtime.access.require_actor(campaign_id, actor_id, principal_id)
+            actor_id = runtime.require_actor_authority(campaign_id, actor_id, principal_id)
         elif membership.role not in ADMIN_ROLES:
             visible_actors = runtime.actor_query(campaign_id, principal_id=principal_id).get(
                 "actors", []
@@ -681,6 +693,12 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
         expected_revision: int,
         expected_branch_id: str,
         idempotency_key: str,
+        facts: list[dict[str, Any]] | None = None,
+        actor_knowledge: list[dict[str, Any]] | None = None,
+        snapshot: dict[str, Any] | None = None,
+        audience_scope: str = "public",
+        participants: list[dict[str, Any]] | None = None,
+        payload: dict[str, Any] | None = None,
         principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID,
     ) -> dict[str, Any]:
         return runtime.activity_settle(
@@ -688,6 +706,12 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
             activity="downtime",
             summary=summary,
             changes=changes,
+            facts=facts,
+            actor_knowledge=actor_knowledge,
+            snapshot=snapshot,
+            audience_scope=audience_scope,
+            participants=participants,
+            payload=payload,
             **common(principal_id, expected_revision, expected_branch_id, idempotency_key),
         )
 
@@ -699,6 +723,12 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
         expected_revision: int,
         expected_branch_id: str,
         idempotency_key: str,
+        facts: list[dict[str, Any]] | None = None,
+        actor_knowledge: list[dict[str, Any]] | None = None,
+        snapshot: dict[str, Any] | None = None,
+        audience_scope: str = "public",
+        participants: list[dict[str, Any]] | None = None,
+        payload: dict[str, Any] | None = None,
         principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID,
     ) -> dict[str, Any]:
         return runtime.activity_settle(
@@ -706,6 +736,12 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
             activity="world_turn",
             summary=summary,
             changes=changes,
+            facts=facts,
+            actor_knowledge=actor_knowledge,
+            snapshot=snapshot,
+            audience_scope=audience_scope,
+            participants=participants,
+            payload=payload,
             **common(principal_id, expected_revision, expected_branch_id, idempotency_key),
         )
 
@@ -770,7 +806,7 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
     def snapshot_query(
         campaign_id: str, principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID
     ) -> dict[str, Any]:
-        runtime.access.require_campaign(campaign_id, principal_id)
+        runtime.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
         return {"snapshots": [asdict(item) for item in runtime.snapshots.list(campaign_id)]}
 
     @mcp.tool()
@@ -784,16 +820,19 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
         idempotency_key: str = "",
         principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID,
     ) -> dict[str, Any]:
-        roles = ADMIN_ROLES if action == "restore" else None
-        runtime._require_branch_revision(
-            campaign_id,
-            principal_id=principal_id,
-            expected_revision=expected_revision,
-            expected_branch_id=expected_branch_id,
-            roles=roles,
-        )
+        runtime.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
         if action == "restore" and slot is None:
             raise ValueError("snapshot restore requires slot")
+        if action == "create":
+            return runtime.snapshot_create(
+                campaign_id,
+                label=label,
+                principal_id=principal_id,
+                expected_revision=expected_revision,
+                expected_branch_id=expected_branch_id,
+                idempotency_key=idempotency_key,
+            )
+        runtime.require_no_open_npc_conversation(campaign_id)
         scope = f"narrative:snapshot:{action}:{campaign_id}:{expected_branch_id}:{principal_id}"
         payload = {
             "action": action,
@@ -801,15 +840,20 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
             "slot": slot,
             "expected_revision": expected_revision,
         }
+        key = str(idempotency_key or "").strip()
+        if not key:
+            raise ValueError("idempotency_key is required")
+        replay = runtime.idempotency.lookup(scope, key, payload)
+        if replay is not None and replay.response is not None:
+            return deepcopy(replay.response)
         write = IdempotencyWrite(scope, payload, lambda result: {"snapshot": asdict(result)})
-        result = (
-            runtime.snapshots.create(
-                campaign_id, label=label, idempotency_key=idempotency_key, idempotency_write=write
-            )
-            if action == "create"
-            else runtime.snapshots.restore(
-                campaign_id, int(slot), idempotency_key=idempotency_key, idempotency_write=write
-            )
+        result = runtime.snapshots.restore(
+            campaign_id,
+            int(slot),
+            expected_revision=expected_revision,
+            expected_branch_id=expected_branch_id,
+            idempotency_key=key,
+            idempotency_write=write,
         )
         return {"snapshot": asdict(result)}
 
@@ -817,7 +861,7 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
     def branch_query(
         campaign_id: str, principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID
     ) -> dict[str, Any]:
-        runtime.access.require_campaign(campaign_id, principal_id)
+        runtime.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
         return {"branches": [asdict(item) for item in runtime.branches.list(campaign_id)]}
 
     @mcp.tool()
@@ -832,13 +876,8 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
         idempotency_key: str = "",
         principal_id: str = LOCAL_SYSTEM_PRINCIPAL_ID,
     ) -> dict[str, Any]:
-        runtime._require_branch_revision(
-            campaign_id,
-            principal_id=principal_id,
-            expected_revision=expected_revision,
-            expected_branch_id=expected_branch_id,
-            roles=ADMIN_ROLES,
-        )
+        runtime.access.require_campaign(campaign_id, principal_id, roles=ADMIN_ROLES)
+        runtime.require_no_open_npc_conversation(campaign_id)
         scope = f"narrative:branch:{action}:{campaign_id}:{expected_branch_id}:{principal_id}"
         payload = {
             "action": action,
@@ -847,7 +886,18 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
             "checkout": checkout,
             "expected_revision": expected_revision,
         }
-        write = IdempotencyWrite(scope, payload, lambda result: {"branch": asdict(result)})
+        key = str(idempotency_key or "").strip()
+        if not key:
+            raise ValueError("idempotency_key is required")
+        replay = runtime.idempotency.lookup(scope, key, payload)
+        if replay is not None and replay.response is not None:
+            return deepcopy(replay.response)
+
+        def branch_response(result: Any) -> dict[str, Any]:
+            value = result.get("branch") if isinstance(result, dict) else result
+            return {"branch": asdict(value)}
+
+        write = IdempotencyWrite(scope, payload, branch_response)
         if action == "checkout" and not branch_id:
             raise ValueError("branch checkout requires branch_id")
         result = (
@@ -855,14 +905,18 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
                 campaign_id,
                 name=name,
                 checkout=checkout,
-                idempotency_key=idempotency_key,
+                expected_revision=expected_revision,
+                expected_branch_id=expected_branch_id,
+                idempotency_key=key,
                 idempotency_write=write,
             )
             if action == "create"
             else runtime.branches.checkout(
                 campaign_id,
                 str(branch_id),
-                idempotency_key=idempotency_key,
+                expected_revision=expected_revision,
+                expected_branch_id=expected_branch_id,
+                idempotency_key=key,
                 idempotency_write=write,
             )
         )

@@ -16,6 +16,8 @@ The MCP owns:
   receipts;
 - immutable profile and Pack versions, activation, dependency checks, and seed
   materialization;
+- campaign membership/actor/element grant and revoke operations, last-owner
+  protection, and actor-sheet updates under profile-aware authority;
 - typed narrative records, scenes, conflicts, downtime, world turns, facts,
   actor knowledge, events, and atomic settlement;
 - isolated NPC conversation journals and selected-proposal settlement;
@@ -66,6 +68,11 @@ and recovery but cannot read private narrative state or author objective facts
 without actor or element authority. Element grants may be scoped to a scene and
 can rotate without creating a hidden permanent GM.
 
+That separation also applies to actor reads, ActorKnowledge writes, NPC
+activation, event participants, and scene lifecycle. Scene start/update/end
+requires facilitator authority or a declared active steward whose current
+element grants match the scene.
+
 Persistent NPC dialogue is bound to its owning principal, NPC actor grant, and
 private worker identifier. Raw proposals remain private. A close operation may
 select proposals and atomically commit the approved public event and state
@@ -77,10 +84,13 @@ Director.
 
 `state_revision` is an audit listing surface. It does not advertise generic
 undo/redo because core revision documents do not cover every narrative side
-ledger as one reversible unit. Authoritative recovery uses snapshots and
-branches: inspect, restore into a recoverable branch, refresh exposure and host
-binding, then prove the next legal native call. Skills must never simulate a
-compatibility undo path.
+ledger as one reversible unit. Authoritative recovery uses administrator-only
+snapshots and branches: inspect, restore into a recoverable branch, refresh
+exposure and host binding, then prove the next legal native call. Snapshot
+creation participates in campaign CAS and advances the campaign revision. Any
+open NPC conversation must first be closed or aborted; recovery never carries a
+live private-worker context across an authoritative checkout.
+Skills must never simulate a compatibility undo path.
 
 ## Deployment boundary
 
