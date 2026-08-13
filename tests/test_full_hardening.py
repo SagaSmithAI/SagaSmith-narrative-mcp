@@ -513,4 +513,6 @@ def test_snapshot_and_branch_changes_are_admin_cas_and_exactly_replayable(
         "principal_id": "owner",
     }
     branch = branch_tool.fn(**branch_arguments)
+    assert branch["campaign_revision"] == revision + 1
+    assert state(rt, campaign_id)[0] == branch["campaign_revision"]
     assert branch_tool.fn(**branch_arguments) == branch

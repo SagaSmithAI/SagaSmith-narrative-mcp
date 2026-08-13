@@ -895,7 +895,12 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
 
         def branch_response(result: Any) -> dict[str, Any]:
             value = result.get("branch") if isinstance(result, dict) else result
-            return {"branch": asdict(value)}
+            revision = int(expected_revision) + (
+                1
+                if action == "create"
+                else int(str(branch_id or "") != str(expected_branch_id))
+            )
+            return {"branch": asdict(value), "campaign_revision": revision}
 
         write = IdempotencyWrite(scope, payload, branch_response)
         if action == "checkout" and not branch_id:
@@ -920,7 +925,10 @@ def create_server(config: McpConfig | None = None) -> FastMCP:
                 idempotency_write=write,
             )
         )
-        return {"branch": asdict(result)}
+        return {
+            "branch": asdict(result),
+            "campaign_revision": runtime.campaigns.get(campaign_id).revision,
+        }
 
     @mcp.tool()
     def state_revision(
