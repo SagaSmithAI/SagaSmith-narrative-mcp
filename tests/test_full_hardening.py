@@ -141,6 +141,7 @@ def test_facilitatorless_owner_has_no_implicit_actor_authority_and_actor_can_upd
         expected_branch_id=state(rt, campaign_id)[1],
         idempotency_key="actor-create",
     )
+    assert actor["revision"] == 1
     with pytest.raises(PermissionError):
         rt.actor_query(campaign_id, principal_id="owner", actor_id=actor["id"])
 

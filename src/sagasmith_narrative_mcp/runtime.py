@@ -1530,6 +1530,7 @@ class NarrativeRuntime:
             )
             self._validate_actor_profile(active_profile(document), value)
             session.add(actor_row)
+            session.flush()
             before = deepcopy(campaign.state)
             changed = session.execute(
                 update(Campaign)
