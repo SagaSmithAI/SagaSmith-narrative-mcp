@@ -514,7 +514,7 @@ def test_snapshot_and_branch_changes_are_admin_cas_and_exactly_replayable(
         assert stored.uncompressed_size > 0
         assert stored.compressed_payload
     document = rt.snapshots.get(campaign_id, first["snapshot"]["slot"])
-    assert document["storage_mode"] == "full"
+    assert "storage_mode" not in document
     assert document["valid"] is True
     assert document["payload"]["campaign"]["name"] == "Full hardening"
     with rt.database.engine.connect() as connection:
