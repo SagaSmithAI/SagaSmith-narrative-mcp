@@ -521,7 +521,7 @@ def test_snapshot_and_branch_changes_are_admin_cas_and_exactly_replayable(
     with rt.database.engine.connect() as connection:
         assert connection.exec_driver_sql(
             "SELECT version_num FROM alembic_version"
-        ).scalar_one() == "20260814_29"
+        ).scalar_one() == "20260815_32"
     revision, branch_id = state(rt, campaign_id)
     branch_arguments = {
         "campaign_id": campaign_id,
