@@ -92,6 +92,15 @@ open NPC conversation must first be closed or aborted; recovery never carries a
 live private-worker context across an authoritative checkout.
 Skills must never simulate a compatibility undo path.
 
+Snapshot storage is a Core-owned implementation detail. The current schema
+stores every full state document as one bounded `zlib-1` record with both
+document and record checksums. Narrative reads and recovery always cross Core's
+single materialization boundary; they neither inspect storage columns nor walk
+parents to reconstruct state. Server startup applies the single current Core
+Alembic head. The v7-to-v8 cutover is one-way, so deployment requires a
+consistent pre-upgrade database backup and rollback restores that backup with
+the matching runtime rather than introducing a legacy protocol path.
+
 ## Deployment boundary
 
 Unbound stdio is a trusted, single-user local mode. Client-supplied principal

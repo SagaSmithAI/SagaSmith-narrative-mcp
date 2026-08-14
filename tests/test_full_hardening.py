@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 from sagasmith_core.database import Database, sqlite_database_url
+from sagasmith_core.models import CampaignSnapshot
 
 from sagasmith_narrative_mcp.config import McpConfig
 from sagasmith_narrative_mcp.contracts import (
@@ -502,6 +503,24 @@ def test_snapshot_and_branch_changes_are_admin_cas_and_exactly_replayable(
     }
     first = snapshot_tool.fn(**arguments)
     assert snapshot_tool.fn(**arguments) == first
+    assert snapshot_query.fn(campaign_id=campaign_id, principal_id="owner")["snapshots"][-1][
+        "id"
+    ] == first["snapshot"]["id"]
+    with rt.database.transaction() as session:
+        stored = session.get(CampaignSnapshot, first["snapshot"]["id"])
+        assert stored is not None
+        assert stored.schema_version == 8
+        assert stored.payload_codec == "zlib-1"
+        assert stored.uncompressed_size > 0
+        assert stored.compressed_payload
+    document = rt.snapshots.get(campaign_id, first["snapshot"]["slot"])
+    assert document["storage_mode"] == "full"
+    assert document["valid"] is True
+    assert document["payload"]["campaign"]["name"] == "Full hardening"
+    with rt.database.engine.connect() as connection:
+        assert connection.exec_driver_sql(
+            "SELECT version_num FROM alembic_version"
+        ).scalar_one() == "20260814_29"
     revision, branch_id = state(rt, campaign_id)
     branch_arguments = {
         "campaign_id": campaign_id,

@@ -17,6 +17,9 @@ Lobby administrators can inspect campaign-scoped profile/Pack drafts through
 `narrative_query`. Access changes support grant and revoke operations with
 last-owner protection; controlled actors can be updated through `actor_change`.
 Recovery queries and snapshot/branch mutations are administrator-only.
+Snapshots remain independently restorable full state documents at the public
+boundary. Core schema v8 stores each document as one bounded, checksummed
+`zlib-1` record; restore and branch checkout do not replay an ancestor chain.
 
 See [Architecture and authority](docs/architecture.md) and
 [Profile and Pack lifecycle](docs/profile-and-pack.md) for the durable product
@@ -58,6 +61,16 @@ Run locally with `sagasmith-narrative-mcp`. Its independent default home is
 `SAGASMITH_NARRATIVE_MCP_DATABASE_URL` to use an explicit database, and
 `SAGASMITH_NARRATIVE_MCP_BOUND_PRINCIPAL_ID` when the transport authenticates
 one principal.
+
+The server applies Core Alembic migrations at startup. Before the first launch
+with Snapshot schema v8, stop the server and take a consistent backup of the
+SQLite database (including a settled WAL), or use the external database's
+native backup mechanism. The one-time cutover accepts complete, checksum-valid
+schema-v7 snapshots and removes the old JSON `payload` column. Schema v3-v6
+snapshots must first be materialized by their matching historical runtime.
+There is no database downgrade or dual-protocol mode: rollback means restoring
+the pre-upgrade database backup together with the matching Core and MCP
+versions.
 
 Without `SAGASMITH_NARRATIVE_MCP_BOUND_PRINCIPAL_ID`, stdio is a trusted
 single-user local mode; model-supplied principal fields are not multiplayer

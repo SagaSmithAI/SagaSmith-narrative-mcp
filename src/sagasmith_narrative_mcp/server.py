@@ -271,7 +271,7 @@ class SessionExposureFastMCP(FastMCP):
 def create_server(config: McpConfig | None = None) -> FastMCP:
     config = config or McpConfig.from_environment()
     database = Database(config.database_url)
-    database.create_schema()
+    database.upgrade_schema()
     default_local_principal(database)
     runtime = NarrativeRuntime(database)
     registry = ExposureRegistry()
