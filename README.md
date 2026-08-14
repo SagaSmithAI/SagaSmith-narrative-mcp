@@ -62,15 +62,12 @@ Run locally with `sagasmith-narrative-mcp`. Its independent default home is
 `SAGASMITH_NARRATIVE_MCP_BOUND_PRINCIPAL_ID` when the transport authenticates
 one principal.
 
-The server applies Core Alembic migrations at startup. Before the first launch
-with Snapshot schema v8, stop the server and take a consistent backup of the
-SQLite database (including a settled WAL), or use the external database's
-native backup mechanism. The one-time cutover accepts complete, checksum-valid
-schema-v7 snapshots and removes the old JSON `payload` column. Schema v3-v6
-snapshots must first be materialized by their matching historical runtime.
-There is no database downgrade or dual-protocol mode: rollback means restoring
-the pre-upgrade database backup together with the matching Core and MCP
-versions.
+The server applies Core Alembic migrations at startup and requires the current
+Snapshot schema v8. Before deployment, stop the server and take a consistent
+backup of the SQLite database (including a settled WAL), or use the external
+database's native backup mechanism. There is no database downgrade or
+dual-protocol mode: rollback restores the database together with matching Core
+and MCP versions as one unit.
 
 Without `SAGASMITH_NARRATIVE_MCP_BOUND_PRINCIPAL_ID`, stdio is a trusted
 single-user local mode; model-supplied principal fields are not multiplayer

@@ -97,9 +97,9 @@ stores every full state document as one bounded `zlib-1` record with both
 document and record checksums. Narrative reads and recovery always cross Core's
 single materialization boundary; they neither inspect storage columns nor walk
 parents to reconstruct state. Server startup applies the single current Core
-Alembic head. The v7-to-v8 cutover is one-way, so deployment requires a
-consistent pre-upgrade database backup and rollback restores that backup with
-the matching runtime rather than introducing a legacy protocol path.
+Alembic head and requires the current snapshot schema. Deployment requires a
+consistent database backup; rollback restores that database with its matching
+runtime as one unit.
 
 ## Deployment boundary
 
