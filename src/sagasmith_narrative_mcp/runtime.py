@@ -2451,6 +2451,11 @@ class NarrativeRuntime:
                 branch.id,
                 event_type=str(event.get("event_type") or "narrative"),
                 summary=required_text(event.get("summary"), "event.summary", limit=1000),
+                retrieval_text=(
+                    str(event["retrieval_text"]).strip()
+                    if event.get("retrieval_text") is not None
+                    else None
+                ),
                 payload=deepcopy(dict(event.get("payload") or {})),
                 audience_scope=str(event.get("audience_scope") or "public"),
                 participants=participants,

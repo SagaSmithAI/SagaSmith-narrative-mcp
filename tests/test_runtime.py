@@ -164,7 +164,11 @@ def test_narrative_settlement_is_atomic(tmp_path: Path) -> None:
         expected_revision=revision,
         expected_branch_id=branch,
         idempotency_key="settle",
-        event={"summary": "The village learns the truth.", "audience_scope": "public"},
+        event={
+            "summary": "The village learns the truth.",
+            "retrieval_text": "village truth public revelation",
+            "audience_scope": "public",
+        },
         record_changes=[{"action": "create", "record": {"id": "clock.truth", "kind": "clock"}}],
         facts=[
             {
@@ -176,6 +180,7 @@ def test_narrative_settlement_is_atomic(tmp_path: Path) -> None:
         ],
     )
     assert result["event"]["sequence"] == 1
+    assert result["event"]["retrieval_text"] == "village truth public revelation"
     assert narrative_document(rt.campaigns.get(campaign_id).state)["records"]["clock.truth"]
 
 
