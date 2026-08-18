@@ -1,5 +1,7 @@
 # SagaSmith Narrative MCP
 
+[Website](https://sagasmithai.github.io) · [Platform overview](https://github.com/SagaSmithAI/.github/blob/main/profile/README.md) · [Hosted service](https://github.com/SagaSmithAI/SagaSmith-service) · [Content catalog](https://github.com/SagaSmithAI/SagaSmith-dnd-content-library)
+
 An authoritative, system-neutral MCP for long-form tabletop narrative play. It
 depends on `sagasmith-core` for durable campaigns, transactions, revisions,
 documents, continuity ledgers, snapshots, and branches.
