@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: SagaSmith-narrative-mcp
+      - uses: actions/checkout@v4
+        with:
+          repository: SagaSmithAI/sagasmith-core
+          path: sagasmith-core
+      - uses: actions/checkout@v4
+        with:
+          repository: SagaSmithAI/SagaSmith-agent
+          path: SagaSmith-agent
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install locked Narrative MCP environment
+        working-directory: SagaSmith-narrative-mcp
+        run: uv sync --frozen --all-extras
+      - name: Lint and test public MCP behavior
+        working-directory: SagaSmith-narrative-mcp
+        run: |
+          uv run ruff check .
+          uv run pytest --ignore=tests/test_agent_host_integration.py
+      - name: Install locked Agent host environment
+        working-directory: SagaSmith-agent
+        run: uv sync --frozen
+      - name: Verify real Agent dynamic-tool refresh
+        working-directory: SagaSmith-narrative-mcp
+        run: ../SagaSmith-agent/.venv/bin/python -m pytest -q tests/test_agent_host_integration.py
+      - name: Run all campaign fixtures through real stdio sessions
+        working-directory: SagaSmith-narrative-mcp
+        run: uv run python scripts/regression_parallel_campaigns.py --output .runs/ci

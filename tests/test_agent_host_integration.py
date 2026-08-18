@@ -29,7 +29,9 @@ async def _exercise_agent_host(tmp_path: Path) -> None:
             ),
         }
         registry = ToolRegistry()
-        narrative_python = root / ".venv" / "Scripts" / "python.exe"
+        narrative_python = root / ".venv" / (
+            "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        )
         assert narrative_python.is_file(), "install Narrative MCP dev environment first"
         connections = await connect_mcp_servers(
             {
